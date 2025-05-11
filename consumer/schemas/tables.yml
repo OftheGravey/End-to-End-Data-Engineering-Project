@@ -95,3 +95,65 @@ order_items:
     comment:
       op: omit
       type: string
+carriers:
+  columns:
+    carrier_id:
+      type: int
+    name:
+      type: string
+    contact_email:
+      type: string
+    phone:
+      type: string
+    tracking_url_template:
+      type: string
+shipping_services:
+  columns:
+    service_id:
+      type: int
+    carrier_id:
+      type: int
+    service_name:
+      type: string
+    estimated_days:
+      type: int
+    cost_estimate:
+      type: numeric
+      decimals: 2
+shipments:
+  columns:
+    shipment_id:
+      type: int
+    order_id:
+      type: int
+    carrier_id:
+      type: int
+    service_id:
+      type: int
+    tracking_number:
+      type: string
+    shipping_status:
+      type: string
+    shipped_date:
+      type: date
+    expected_delivery_date:
+      type: date
+    actual_delivery_date:
+      type: date
+    shipping_cost:
+      type: numeric
+      decimals: 2
+shipment_events:
+  columns:
+    event_id:
+      type: int
+    shipment_id:
+      type: int
+    status:
+      type: string
+    location:
+      type: string
+    event_time:
+      type: timestamp
+    notes:
+      type: string

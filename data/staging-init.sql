@@ -1,3 +1,4 @@
+-- store_db
 -- AUTHORS
 CREATE TABLE IF NOT EXISTS authors (
     author_id INTEGER,
@@ -93,3 +94,70 @@ CREATE TABLE IF NOT EXISTS order_items (
     transaction_id TEXT,
     lsn BIGINT
 );
+
+-- shipping_db
+-- CARRIERS
+CREATE TABLE IF NOT EXISTS carriers (
+    carrier_id INTEGER,
+    name VARCHAR,
+    contact_email VARCHAR,
+    phone VARCHAR,
+    tracking_url_template VARCHAR,
+    op TEXT,
+    emitted_ts_ms BIGINT,
+    ts_ms BIGINT,
+    connector_version TEXT,
+    transaction_id TEXT
+);
+
+
+-- SHIPPING SERVICES
+CREATE TABLE IF NOT EXISTS shipping_services (
+    service_id INTEGER,
+    carrier_id INTEGER,
+    service_name VARCHAR,
+    estimated_days INTEGER,
+    cost_estimate DECIMAL(10, 2),
+    op TEXT,
+    emitted_ts_ms BIGINT,
+    ts_ms BIGINT,
+    connector_version TEXT,
+    transaction_id TEXT
+);
+
+
+-- SHIPMENTS
+CREATE TABLE IF NOT EXISTS shipments (
+    shipment_id INTEGER,
+    order_id INTEGER,
+    carrier_id INTEGER,
+    service_id INTEGER,
+    tracking_number VARCHAR,
+    shipping_status VARCHAR,
+    shipped_date DATE,
+    expected_delivery_date DATE,
+    actual_delivery_date DATE,
+    shipping_cost DECIMAL(10, 2),
+    op TEXT,
+    emitted_ts_ms BIGINT,
+    ts_ms BIGINT,
+    connector_version TEXT,
+    transaction_id TEXT
+);
+
+
+-- SHIPMENT EVENTS
+CREATE TABLE IF NOT EXISTS shipment_events (
+    event_id INTEGER,
+    shipment_id INTEGER,
+    status VARCHAR,
+    location VARCHAR,
+    event_time TIMESTAMP,
+    notes TEXT,
+    op TEXT,
+    emitted_ts_ms BIGINT,
+    ts_ms BIGINT,
+    connector_version TEXT,
+    transaction_id TEXT
+);
+

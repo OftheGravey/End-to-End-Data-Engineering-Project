@@ -47,7 +47,6 @@ class DataOperator(Enum):
     mask_phone_number = partial(op_mask_phone_number)
 
 server_uri = "localhost:29092"
-topic_root = 'pg-changes.public'
 
 def load_schema(topic):
     with open("schemas/tables.yml") as file:
@@ -108,8 +107,13 @@ def parse_data(msg, schema, before=False):
     p_record['emitted_ts_ms'] = data['payload']['ts_ms']
     p_record['ts_ms'] = data['payload']['source']['ts_ms']
     p_record['connector_version'] = data['payload']['source']['version']
-    p_record['transaction_id'] = data['payload']['source']['txId']
-    p_record['lsn'] = data['payload']['source']['lsn']
+
+    if data['payload']['source']['connector'] == 'postgresql':
+        p_record['lsn'] = data['payload']['source']['lsn']
+        p_record['transaction_id'] = data['payload']['source']['txId']
+    else:
+        # currently shipping_db doesn't have gtid enabled. Will be null
+        p_record['transaction_id'] = data['payload']['source']['gtid']
 
     # prune no changes update
     if op == 'u' and not before:
@@ -133,19 +137,20 @@ def develop_insert_query(table, record):
 
 def sub_to_topic(topic: str, conn: duckdb.DuckDBPyConnection):
     consumer = KafkaConsumer(
-        f"{topic_root}.{topic}",
+        f"{topic}",
         bootstrap_servers=[server_uri],
         auto_offset_reset="earliest",
         enable_auto_commit=False,
         group_id="staging"
     )
 
-    schema = load_schema(topic)
+    table_name = topic.split('.')[-1]
+    schema = load_schema(table_name)
     for msg in consumer:
         record = parse_data(msg, schema)
         if record is None:
             continue
-        insert_query = develop_insert_query(topic, record)
+        insert_query = develop_insert_query(table_name, record)
         conn.execute(insert_query, tuple(record.values()))
         consumer.commit()
 
@@ -159,19 +164,22 @@ if __name__ == "__main__":
 
         #sub_to_topic('customers', conn)
         topics = [
-            'authors',
-            'orders',
-            'order_items',
-            'books',
-            'customers',
+            'pg-changes.public.authors',
+            'pg-changes.public.orders',
+            'pg-changes.public.order_items',
+            'pg-changes.public.books',
+            'pg-changes.public.customers',
+            'mysql-changes.shipping_db.carriers',
+            'mysql-changes.shipping_db.shipment_events',
+            'mysql-changes.shipping_db.shipments',
+            'mysql-changes.shipping_db.shipping_services'
         ]
         ts = [Thread(target=sub_to_topic, args=(tp, conn), daemon=True) for tp in topics]
-
         for t in ts:
             t.start()
 
-        for t in ts:
+        while 1:
             quit = input("Quit? ")
             if quit == 'q':
                 break
-            t.join()
+            conn.commit()
