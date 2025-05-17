@@ -1,5 +1,5 @@
 CREATE TABLE
-    IF NOT EXISTS f_order_item_events AS (
+    IF NOT EXISTS f_order_item_transactions AS (
         SELECT
             gen_random_uuid () AS order_item_event_sk,
             dor.order_sk,

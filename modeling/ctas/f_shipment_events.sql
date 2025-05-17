@@ -22,4 +22,5 @@ CREATE TABLE
             AND src.service_id = dcr.service_id
             AND TO_TIMESTAMP(src.ts_ms/1000) >= dcr.valid_from
             AND TO_TIMESTAMP(src.ts_ms/1000) < dcr.valid_to
+            INNER JOIN d_date ddd ON ddd.date = CAST(TO_TIMESTAMP(src.ts_ms/1000) AS DATE)
     );
