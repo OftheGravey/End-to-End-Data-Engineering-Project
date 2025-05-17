@@ -67,12 +67,10 @@ def process_dtypes(col, value):
         num_value /= 10 ** col['decimals']
         return num_value
     elif col['type'] == 'date':
-        print(value)
         days = relativedelta(days=value)
         date_value = date(1970, 1, 1) + days
         return date_value
     elif col['type'] == 'timestamp':
-        print(value)
         dt_value = datetime.fromtimestamp(value/1000000)
         return dt_value
     raise Exception("Invalid Column")
@@ -147,19 +145,21 @@ def sub_to_topic(topic: str, conn: duckdb.DuckDBPyConnection):
     table_name = topic.split('.')[-1]
     schema = load_schema(table_name)
     for msg in consumer:
+        print(f"{topic} message received")
         record = parse_data(msg, schema)
         if record is None:
             continue
         insert_query = develop_insert_query(table_name, record)
         conn.execute(insert_query, tuple(record.values()))
         consumer.commit()
+        print(f"{topic} message inserted")
 
 def init_staging_db(conn: duckdb.DuckDBPyConnection):
-    with open("data/staging-init.sql") as init_sql:
+    with open("../data/staging-init.sql") as init_sql:
         conn.execute(init_sql.read())
 
 if __name__ == "__main__":
-    with duckdb.connect("data/staging.db") as conn:
+    with duckdb.connect("../data/staging.db") as conn:
         init_staging_db(conn)
 
         #sub_to_topic('customers', conn)

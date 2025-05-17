@@ -13,7 +13,7 @@ CREATE TABLE books (
     book_id SERIAL PRIMARY KEY,
     title VARCHAR(150) NOT NULL,
     author_id INT NOT NULL REFERENCES authors(author_id) ON DELETE CASCADE,
-    isbn VARCHAR(13) UNIQUE NOT NULL,
+    isbn VARCHAR(17) UNIQUE NOT NULL,
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
     published_date DATE,
     description TEXT,
