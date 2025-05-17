@@ -1,5 +1,3 @@
-CREATE TABLE
-    IF NOT EXISTS d_date AS
 SELECT
     gen_random_uuid () AS date_sk,
     CAST(date AS date) AS date,
@@ -19,4 +17,4 @@ FROM
         DATE '2010-01-01',
         DATE '2030-12-31',
         INTERVAL 1 DAY
-    ) AS t (date);
+    ) AS t (date)

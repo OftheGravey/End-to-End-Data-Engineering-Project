@@ -1,0 +1,145 @@
+version: 2
+
+models:
+  - name: d_books
+    description: >
+      Dimension table representing books and their authors. Tracks slowly changing attributes of books (SCD0) 
+      and author details as they were at the time the book record was created.
+    columns:
+      - name: book_sk
+        description: Surrogate primary key for the book dimension.
+        tests:
+          - unique
+          - not_null
+      - name: book_nk
+        description: Natural key for the book (book_id from source).
+        tests:
+          - not_null
+      - name: author_nk
+        description: Natural key for the author (author_id from source).
+        tests:
+          - not_null
+      - name: title
+        description: Title of the book (SCD Type 0).
+      - name: isbn
+        description: ISBN identifier for the book (SCD Type 0).
+      - name: published_date
+        description: Date the book was published (SCD Type 0).
+      - name: genre
+        description: Genre of the book (SCD Type 0).
+      - name: book_added
+        description: Timestamp when the book was first seen in the CDC stream.
+      - name: author_first_name
+        description: Author's first name at the time of book creation.
+      - name: author_last_name
+        description: Author's last name at the time of book creation.
+      - name: author_country
+        description: Country of the author at the time of book creation.
+  - name: d_carriers_services
+    description: |
+      Dimension table combining carrier and shipping service information. Implements a hybrid SCD model: SCD0 for identifiers, SCD1 for names and contact details, and SCD2 for service pricing and validity tracking.
+    columns:
+      - name: carrier_service_sk
+        description: Surrogate primary key for the carrier-service dimension.
+        tests:
+          - unique
+          - not_null
+      - name: carrier_id
+        description: Natural key for the carrier (SCD Type 0).
+        tests:
+          - not_null
+      - name: service_id
+        description: Natural key for the service (SCD Type 0).
+        tests:
+          - not_null
+      - name: carrier_name
+        description: Name of the carrier (SCD Type 1).
+      - name: carrier_contact_email
+        description: Email contact for the carrier (SCD Type 1).
+      - name: carrier_phone
+        description: Phone number of the carrier (SCD Type 1).
+      - name: carrier_tracking_url_template
+        description: Tracking URL template for the carrier (SCD Type 1).
+      - name: service_name
+        description: Name of the shipping service (SCD Type 1).
+      - name: estimated_days
+        description: Estimated number of delivery days (SCD Type 2).
+      - name: cost_estimate
+        description: Estimated cost of the shipping service (SCD Type 2).
+      - name: valid_from
+        description: Start of the validity period for the SCD Type 2 values.
+      - name: valid_to
+        description: End of the validity period for the SCD Type 2 values.
+  - name: d_customers
+    description: >
+      Customer dimension with hybrid SCD handling. Includes Type 0 (immutable keys), 
+      Type 1 (name fields), and Type 2 (contact and address fields) to track customer 
+      profile changes over time from CDC data.
+    columns:
+      - name: customer_sk
+        description: Surrogate key generated for the dimension.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Natural key for the customer (Type 0).
+        tests:
+          - not_null
+      - name: first_name
+        description: Customer's first name (Type 1 - overwritten on change).
+      - name: last_name
+        description: Customer's last name (Type 1 - overwritten on change).
+      - name: email
+        description: Email address of the customer (Type 2 - history tracked).
+      - name: phone
+        description: Phone number of the customer (Type 2 - history tracked).
+      - name: street_address
+        description: Street portion of the address (Type 2 - history tracked).
+      - name: city
+        description: City portion of the address (Type 2 - history tracked).
+      - name: state
+        description: State or region of the customer (Type 2 - history tracked).
+      - name: postal_code
+        description: Postal or ZIP code of the customer (Type 2 - history tracked).
+      - name: country
+        description: Country of the customer (Type 2 - history tracked).
+      - name: valid_from
+        description: Timestamp when the current version of the record became valid.
+      - name: valid_to
+        description: Timestamp when the current version of the record stopped being valid. Defaults to 9999-12-31 for current version.
+  - name: d_orders
+    description: >
+      Type 2 Slowly Changing Dimension for customer orders, including order status,
+      shipping method, and order date history. Each row represents a version of an order's state.
+    columns:
+      - name: order_sk
+        description: Surrogate key for the order dimension (UUID).
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Natural key from the operational orders table.
+      - name: status
+        description: Order status at the time (e.g., pending, shipped, delivered, etc.).
+      - name: shipping_method
+        description: Shipping method chosen for the order at the time (e.g., FedEx Ground, UPS 2nd Day).
+      - name: order_date
+        description: The date when the order was placed (UTC).
+      - name: valid_from
+        description: Timestamp when this version of the order became valid.
+      - name: valid_to
+        description: Timestamp when this version of the order ceased to be valid.
+  - name: d_shipments
+    description: >
+      Type 1 dimension for shipments. Captures the most recent state of each shipment
+      without preserving historical changes.
+    columns:
+      - name: shipment_sk
+        description: Surrogate key for the shipment dimension (UUID).
+        tests:
+          - unique
+          - not_null
+      - name: shipment_id
+        description: Natural key for the shipment, typically the source system identifier.
+      - name: tracking_number
+        description: Tracking number for the shipment.

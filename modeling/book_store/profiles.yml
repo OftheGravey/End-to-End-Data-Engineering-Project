@@ -1,0 +1,7 @@
+book_store:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: '../../data/staging.db'
+      threads: 1

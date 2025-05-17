@@ -1,0 +1,267 @@
+version: 2
+
+sources:
+  - database: staging_db
+    description: Unified source of CDC-extracted data from store and shipping systems captured via Debezium.
+    name: staging_db
+    schema: main
+    tables:
+      - columns:
+          - description: Primary key for the author.
+            name: author_id
+          - description: Author's first name.
+            name: first_name
+          - description: Author's last name.
+            name: last_name
+          - description: Short biography of the author.
+            name: biography
+          - description: Country of origin for the author.
+            name: country
+          - description: Debezium operation type (c = create, u = update, d = delete, r = snapshot).
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Contains information about book authors.
+        name: authors
+      - columns:
+          - description: Primary key for the book.
+            name: book_id
+          - description: Title of the book.
+            name: title
+          - description: Foreign key referencing authors.author_id.
+            name: author_id
+          - description: International Standard Book Number.
+            name: isbn
+          - description: Retail price of the book.
+            name: price
+          - description: Date when the book was published.
+            name: published_date
+          - description: Short description or summary of the book.
+            name: description
+          - description: Genre or category of the book.
+            name: genre
+          - description: Current inventory count.
+            name: stock
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Contains information about books in the store.
+        name: books
+      - columns:
+          - description: Primary key for the customer.
+            name: customer_id
+          - description: Customer's first name.
+            name: first_name
+          - description: Customer's last name.
+            name: last_name
+          - description: Email address.
+            name: email
+          - description: Contact phone number.
+            name: phone
+          - description: Timestamp when the customer was created.
+            name: created_at
+          - description: Street portion of the customer address.
+            name: street_address
+          - description: City portion of the address.
+            name: city
+          - description: State or province.
+            name: state
+          - description: Postal or ZIP code.
+            name: postal_code
+          - description: Country of residence.
+            name: country
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Stores customer contact and address information.
+        name: customers
+      - columns:
+          - description: Primary key for the order.
+            name: order_id
+          - description: Foreign key referencing customers.customer_id.
+            name: customer_id
+          - description: Date and time when the order was placed.
+            name: order_date
+          - description: Status of the order (e.g., pending, shipped, delivered).
+            name: status
+          - description: Shipping service/method chosen for the order.
+            name: shipping_method
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Captures customer orders and their current status.
+        name: orders
+      - columns:
+          - description: Primary key for the order item.
+            name: order_item_id
+          - description: Foreign key referencing orders.order_id.
+            name: order_id
+          - description: Foreign key referencing books.book_id.
+            name: book_id
+          - description: Quantity of the book ordered.
+            name: quantity
+          - description: Unit price of the book at the time of purchase.
+            name: price_at_purchase
+          - description: Discount applied to the item.
+            name: discount
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Line items within each order, detailing which books were purchased.
+        name: order_items
+      - columns:
+          - description: Primary key for the carrier.
+            name: carrier_id
+          - description: Name of the shipping carrier.
+            name: name
+          - description: Contact email for the carrier.
+            name: contact_email
+          - description: Phone number for carrier support.
+            name: phone
+          - description: URL template for tracking shipments.
+            name: tracking_url_template
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Shipping carriers such as FedEx or UPS.
+        name: carriers
+      - columns:
+          - description: Primary key for the shipping service.
+            name: service_id
+          - description: Foreign key referencing carriers.carrier_id.
+            name: carrier_id
+          - description: Name of the shipping service (e.g., UPS 2nd Day Air).
+            name: service_name
+          - description: Estimated delivery time in days.
+            name: estimated_days
+          - description: Estimated cost of the service.
+            name: cost_estimate
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Different service levels offered by each carrier.
+        name: shipping_services
+      - columns:
+          - description: Primary key for the shipment.
+            name: shipment_id
+          - description: Corresponding order ID from store_db.orders.
+            name: order_id
+          - description: Foreign key referencing carriers.carrier_id.
+            name: carrier_id
+          - description: Foreign key referencing shipping_services.service_id.
+            name: service_id
+          - description: Unique tracking number for the shipment.
+            name: tracking_number
+          - description: Current status of the shipment (ENUM).
+            name: shipping_status
+          - description: Date the shipment was dispatched.
+            name: shipped_date
+          - description: Expected delivery date.
+            name: expected_delivery_date
+          - description: Actual delivery date.
+            name: actual_delivery_date
+          - description: Final cost incurred for shipping.
+            name: shipping_cost
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Records of shipments created for customer orders.
+        name: shipments
+      - columns:
+          - description: Primary key for the event.
+            name: event_id
+          - description: Foreign key referencing shipments.shipment_id.
+            name: shipment_id
+          - description: Status recorded at the event time (ENUM).
+            name: status
+          - description: Location of the shipment during the event.
+            name: location
+          - description: Timestamp of the event.
+            name: event_time
+          - description: Additional notes or remarks about the event.
+            name: notes
+          - description: Debezium operation type.
+            name: op
+          - description: Event timestamp from the source database in milliseconds.
+            name: ts_ms
+          - description: Time when the event was emitted by Debezium.
+            name: emitted_ts_ms
+          - description: Version of the Debezium connector that captured this event.
+            name: connector_version
+          - description: Identifier of the transaction in which the change occurred.
+            name: transaction_id
+          - description: Log sequence number for change tracking.
+            name: lsn
+        description: Logs the status history of each shipment.
+        name: shipment_events
