@@ -1,0 +1,3 @@
+-- Accumulating Snapshot
+
+SELECT  
