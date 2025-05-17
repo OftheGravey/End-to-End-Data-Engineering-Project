@@ -117,7 +117,6 @@ def parse_data(msg, schema, before=False):
     if op == 'u' and not before:
         old = parse_data(msg, schema, before=True)
         if old == p_record:
-            print("HERE")
             return None 
 
     return p_record

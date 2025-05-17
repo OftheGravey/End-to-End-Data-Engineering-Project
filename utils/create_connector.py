@@ -20,7 +20,7 @@ psql_connector_config = {
     }
 }
 mysql_connector_config = {
-  "name": "mysql-connector-2",
+  "name": "mysql-connector",
   "config": {
     "connector.class": "io.debezium.connector.mysql.MySqlConnector",
     "tasks.max": "1",
