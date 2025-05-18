@@ -3,5 +3,5 @@ book_store:
   outputs:
     local:
       type: duckdb
-      path: '../../data/staging.db'
+      path: '../data/staging.db'
       threads: 1

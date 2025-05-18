@@ -110,7 +110,7 @@ This producer is designed to insert and update junk data into the databases. Thi
 ## Data Processing
 After the data changes have landed into the staging.db (a DuckDB file) they are then processed into a Dimensional model using DBT. \
 The data modeling is done using Kimball's Dimensional modeling.
-### Enterprise Data Warehose Bus Martrix
+### Enterprise Data Warehouse Bus Matrix
 | Business Processes  | Grain                                 | Metrics       | Date | Books | Carrier Services | Customers | Orders | Shipments |
 |---------------------|----------------------------------------|---------------|------|-------|------------------|-----------|--------|-----------|
 | Book Inventory      | 1 row per book's stock level per day  | Stock count   |  X   |   X   |                  |           |        |           |
