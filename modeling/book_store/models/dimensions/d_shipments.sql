@@ -1,7 +1,7 @@
 SELECT
     -- SCD 0
-    gen_random_uuid () AS shipment_sk,
     shipment_id,
-    tracking_number
+    tracking_number,
+    gen_random_uuid() AS shipment_sk
 FROM
     {{ source('staging_db','shipments').identifier }}

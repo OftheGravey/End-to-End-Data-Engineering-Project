@@ -22,7 +22,7 @@ For additional information in CDC, this project also enables full replication on
 ```sql
 ALTER TABLE customers REPLICA IDENTITY FULL;
 ```
-This is done to get a full picture of the data before and after the change has occurred. Without this, the payload sent by Kafka does not have the "before" value for the data. This is important is it allows us to distinguish what has changed in an update. If we are not tracking a field that was changed in an update, it is waste to store that change. 
+This is done to get a full picture of the data before and after the change has occurred. Without this, the payload sent by Kafka does not have the "before" value for the data. This is important is it allows us to distinguish what has changed in an update. This allows us discard changes which don't contain any tracked changes.
 #### MySQL - shipping_db
 For MySQL, this is the Binary Log (binlogs). Again, the CDC system needs full row changes, not just statements. Binlogs are enabled and set to full row changes by the following mysql.conf:
 ```conf
