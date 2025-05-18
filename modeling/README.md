@@ -8,7 +8,7 @@
 | Shipment Events     | 1 row per shipment of an order        | Delivery time |  X   |       |        X         |           |   X    |     X     |
 
 
-## How to run
+## How To Run
 Uses UV for package management. Virtual environment setup:
 ```sh
 uv venv
@@ -40,7 +40,7 @@ Transactional fact table logging shipment events, including status updates, cost
 ## Dimension Tables
 
 ### `d_books`
-Book dimension (SCD Type 0) storing static book and author data as recorded at the time of book ingestion.
+Book dimension storing static book and author data as recorded at the time of book ingestion.
 
 ### `d_carriers_services`
 Hybrid SCD dimension combining carrier and service data. Uses SCD0 for identifiers, SCD1 for contact details, and SCD2 for price and service validity.
@@ -53,3 +53,28 @@ SCD Type 2 dimension capturing historical versions of customer orders, tracking 
 
 ### `d_shipments`
 Type 1 dimension for shipments, maintaining only the latest state of each shipment record.
+
+## Source: `staging_db`
+
+Unified CDC source capturing transactional changes from `store_db` and `shipping_db` via **Debezium**. Tables contain append-only event streams enriched with metadata for change tracking and replayability.
+
+### Key Features
+- **Origin**: Extracted via Debezium from upstream operational databases.
+- **CDC Metadata**:
+  - `op`: Operation type (`c`, `u`, `d`, `r`)
+  - `ts_ms`: Source DB event timestamp
+  - `emitted_ts_ms`: Debezium emit time
+  - `transaction_id`, `lsn`, `connector_version`: CDC tracing info
+
+### Tables
+| Table              | Description |
+|--------------------|-------------|
+| `authors`          | Book author details (name, bio, country) |
+| `books`            | Book catalog incl. author, ISBN, price, genre, stock |
+| `customers`        | Customer profiles with contact and address info |
+| `orders`           | Orders placed, status, and shipping method |
+| `order_items`      | Line items for each order, with quantity and discounts |
+| `carriers`         | Shipping carriers (e.g. FedEx, UPS) with contact info |
+| `shipping_services`| Carrier service levels and cost estimates |
+| `shipments`        | Shipments tied to orders with tracking and delivery info |
+| `shipment_events`  | Shipment status history by time and location |
