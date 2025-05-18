@@ -4,7 +4,6 @@ SELECT
     dbk.book_sk,
     ddd.date_sk,
     src.quantity,
-    -- measurements
     src.price_at_purchase,
     src.discount,
     gen_random_uuid() AS order_item_event_sk,

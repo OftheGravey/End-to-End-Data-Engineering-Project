@@ -1,8 +1,8 @@
 SELECT
-    order_id,
     -- SCD 0
-    status,
+    order_id,
     -- SCD 2
+    status,
     shipping_method,
     order_date,
     gen_random_uuid() AS order_sk,
