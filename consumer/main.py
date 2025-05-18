@@ -13,6 +13,7 @@ from dateutil.relativedelta import relativedelta
 from threading import Thread
 from functools import partial
 
+server_uri = "localhost:29092"
 
 def op_hash(value):
     return hashlib.sha256(value.encode()).hexdigest()
@@ -30,9 +31,9 @@ def op_mask_email(email: str):
 def op_mask_phone_number(phone_number: str):
     try:
         ph = phonenumbers.parse(phone_number, region="US")
-        # if not phonenumbers.is_valid_number(ph):
-        #     print("Invalid Number")
-        #     return None
+        if not phonenumbers.is_valid_number(ph):
+            print("Invalid Number")
+            return None
         formatted = phonenumbers.format_number(ph, phonenumbers.PhoneNumberFormat.NATIONAL)
         digits = [c if not c.isdigit() else '*' for c in formatted[:-4]]
         digits += formatted[-4:]  # Keep last 4 digits unmasked
@@ -45,8 +46,6 @@ class DataOperator(Enum):
     hash = partial(op_hash)
     mask_email = partial(op_mask_email)
     mask_phone_number = partial(op_mask_phone_number)
-
-server_uri = "localhost:29092"
 
 def load_schema(topic):
     with open("schemas/tables.yml") as file:
@@ -62,6 +61,8 @@ def process_dtypes(col, value):
     elif col['type'] == 'int':
         return int(value)
     elif col['type'] == 'numeric':
+        if not col.get('decimals'):
+            return None
         decoded_value = base64.b64decode(value)
         num_value = int.from_bytes(decoded_value, byteorder="big", signed=True)
         num_value /= 10 ** col['decimals']
@@ -122,6 +123,8 @@ def parse_data(msg, schema, before=False):
     return p_record
 
 def develop_insert_query(table, record):
+    if not record:
+        raise ValueError("Record must have at least one column.")
     col_str = ', '.join([col for col in record.keys()])
     val_str = ','.join(['?' for _ in record.keys()])
     query = f"""
