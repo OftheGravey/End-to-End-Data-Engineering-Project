@@ -51,3 +51,48 @@ services:
       - STATUS_STORAGE_TOPIC=debezium_statuses
     ports:
       - 8083:8083
+  jobmanager:
+    image: flink:2.0.0-scala_2.12-java21
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    volumes:
+      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
+      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager 
+  taskmanager:
+    image: flink:2.0.0-scala_2.12-java21
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    volumes:
+      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
+      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
+    scale: 1
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2        
+  sql-client:
+    image: flink:2.0.0-scala_2.12-java21
+    command: bin/sql-client.sh
+    volumes:
+      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
+      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
+    depends_on:
+      - jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.address: jobmanager 
+volumes:
+  shared-tmpfs:
+    driver: local
+    driver_opts:
+        type: "tmpfs"
+        device: "tmpfs"
