@@ -43,18 +43,18 @@ CREATE TABLE orders (
     'properties.group.id' = 'testGroup',
     'format' = 'debezium-json',
     'scan.startup.mode' = 'latest-offset',
-    'debezium-json.schema-include' = 'true'
+    'debezium-json.schema-include' = 'false'
 );
 
 CREATE TABLE orders (
-    raw_json STRING
+    payload STRING
 ) WITH (
     'connector' = 'kafka',
     'topic' = 'pg-changes.public.orders',
     'properties.bootstrap.servers' = 'kafka:9092',
     'properties.group.id' = 'testGroup',
-    'format' = 'raw',
-    'scan.startup.mode' = 'latest-offset'
+    'format' = 'json',
+    'scan.startup.mode' = 'earliest-offset'
 );
 
 -- SHIPMENT EVENTS
@@ -65,10 +65,9 @@ CREATE TABLE IF NOT EXISTS shipments (
     service_id INTEGER,
     tracking_number VARCHAR,
     shipping_status VARCHAR,
-    shipped_date DATE,
-    expected_delivery_date DATE,
-    actual_delivery_date DATE,
-    shipping_cost DECIMAL(10, 2),
+    shipped_date_days INTEGER,
+    expected_delivery_date_days INTEGER,
+    actual_delivery_date_days INTEGER,
     op STRING,
     emitted_ts_ms BIGINT,
     ts_ms BIGINT,
@@ -80,5 +79,6 @@ CREATE TABLE IF NOT EXISTS shipments (
     'properties.bootstrap.servers' = 'kafka:9092',
     'properties.group.id' = 'testGroup',
     'format' = 'debezium-json',
-    'scan.startup.mode' = 'earliest-offset'
+    'scan.startup.mode' = 'latest-offset',
+    'debezium-json.schema-include' = 'true'
 );

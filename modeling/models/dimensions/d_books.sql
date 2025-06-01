@@ -12,9 +12,9 @@ SELECT
     min_by(aus.last_name, aus.ts_ms) AS author_last_name,
     min_by(aus.country, aus.ts_ms) AS author_country
 FROM
-    {{ source('staging_db','books').identifier }} AS bks
+    {{ source('staging_db','books') }} AS bks
 INNER JOIN
-    {{ source('staging_db','authors').identifier }} AS aus
+    {{ source('staging_db','authors') }} AS aus
     ON bks.author_id = aus.author_id
 GROUP BY
     bks.book_id,

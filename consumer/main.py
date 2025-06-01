@@ -74,8 +74,8 @@ def process_dtypes(col, value):
     elif col['type'] == 'timestamp':
         dt_value = datetime.fromtimestamp(value/1000000)
         return dt_value
-    raise Exception("Invalid Column")
 
+    raise Exception("Invalid Column")
 def parse_data(msg, schema, before=False):
     if msg.value is None:
         return

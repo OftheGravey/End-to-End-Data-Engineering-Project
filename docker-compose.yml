@@ -1,3 +1,11 @@
+x-flink-shared-vars: &flink-common-variables
+    - DW_USERNAME=${DW_USERNAME}
+    - DW_PASSWORD=${DW_PASSWORD}
+    - DW_HOSTNAME=${DW_HOSTNAME}
+    - DW_PORT=${DW_PORT}
+    - DW_DATABASE=${DW_DATABASE}
+    - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
+
 services:
   store-db:
     image: postgres:14.1-alpine
@@ -10,6 +18,17 @@ services:
     volumes:
       - ./database-init-scripts/postgres/init-scripts:/docker-entrypoint-initdb.d
     command: [ "postgres", "-c", "wal_level=logical" ]
+  postgres-dw:
+    image: postgres:14.1-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=dw_db
+    volumes:
+      - ./database-init-scripts/postgres-dw/init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - 5433:5433
+    command: [ "postgres", "-c", "wal_level=logical", "-c", "port=5433"]
   shipping-db:
     image: mysql:8.0.36
     environment:
@@ -52,44 +71,50 @@ services:
     ports:
       - 8083:8083
   jobmanager:
-    image: flink:2.0.0-scala_2.12-java21
+    image: flink-extractor:latest 
+    links: 
+      - postgres-dw
     ports:
       - "8081:8081"
     command: jobmanager
-    volumes:
-      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
-      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
     environment:
+      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager 
+      - DW_USERNAME=${DW_USERNAME}
+      - DW_PASSWORD=${DW_PASSWORD}
+      - DW_HOSTNAME=${DW_HOSTNAME}
+      - DW_PORT=${DW_PORT}
+      - DW_DATABASE=${DW_DATABASE}
+      - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
   taskmanager:
-    image: flink:2.0.0-scala_2.12-java21
+    image: flink-extractor:latest 
+    links: 
+      - postgres-dw
     depends_on:
       - jobmanager
     command: taskmanager
-    volumes:
-      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
-      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
     scale: 1
     environment:
+      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2        
+        taskmanager.numberOfTaskSlots: 9
   sql-client:
-    image: flink:2.0.0-scala_2.12-java21
-    command: bin/sql-client.sh
-    volumes:
-      - ./flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar:/opt/flink/lib/flink-sql-connector-kafka-4.0.0-2.0.jar
-      - ./flink/lib/flink-json-2.0.0.jar:/opt/flink/lib/flink-json-2.0.0.jar
+    image: flink-extractor:latest 
+    command: sql-client.sh
+    links: 
+      - postgres-dw
     depends_on:
       - jobmanager
     environment:
+      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        rest.address: jobmanager 
+        rest.address: jobmanager
 volumes:
   shared-tmpfs:
     driver: local

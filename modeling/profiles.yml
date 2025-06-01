@@ -1,7 +1,11 @@
 book_store:
-  target: local
+  target: dev
   outputs:
-    local:
-      type: duckdb
-      path: '../data/staging.db'
-      threads: 1
+    dev:
+      type: postgres
+      host: localhost
+      user: postgres
+      password: postgres
+      port: 5433
+      dbname: dw_db
+      schema: dw_db
