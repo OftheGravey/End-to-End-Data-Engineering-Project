@@ -1,21 +1,37 @@
+WITH joined_data AS (
+    SELECT
+        bks.book_id AS book_nk,
+        aus.author_id AS author_nk,
+        bks.title,
+        bks.isbn,
+        bks.published_date,
+        bks.genre,
+        bks.ts_ms AS bks_ts_ms,
+        aus.first_name,
+        aus.last_name,
+        aus.country,
+        aus.ts_ms AS aus_ts_ms,
+        ROW_NUMBER() OVER (PARTITION BY bks.book_id ORDER BY bks.ts_ms) AS book_rn,
+        ROW_NUMBER() OVER (PARTITION BY aus.author_id ORDER BY aus.ts_ms) AS author_rn
+    FROM
+        {{ source('landing_db','books') }} AS bks
+    INNER JOIN
+        {{ source('landing_db','authors') }} AS aus
+        ON bks.author_id = aus.author_id
+)
+
 SELECT
-    bks.book_id AS book_nk,
-    -- SCD 0
-    aus.author_id AS author_nk,
+    book_nk,
+    author_nk,
     gen_random_uuid() AS book_sk,
-    min_by(bks.title, bks.ts_ms) AS title,
-    min_by(bks.isbn, bks.ts_ms) AS isbn,
-    min_by(bks.published_date, bks.ts_ms) AS published_date,
-    min_by(bks.genre, bks.ts_ms) AS genre,
-    min(to_timestamp(bks.ts_ms / 1000)) AS book_added,
-    min_by(aus.first_name, aus.ts_ms) AS author_first_name,
-    min_by(aus.last_name, aus.ts_ms) AS author_last_name,
-    min_by(aus.country, aus.ts_ms) AS author_country
-FROM
-    {{ source('staging_db','books') }} AS bks
-INNER JOIN
-    {{ source('staging_db','authors') }} AS aus
-    ON bks.author_id = aus.author_id
-GROUP BY
-    bks.book_id,
-    aus.author_id
+    MAX(CASE WHEN book_rn = 1 THEN title END) AS title,
+    MAX(CASE WHEN book_rn = 1 THEN isbn END) AS isbn,
+    MAX(CASE WHEN book_rn = 1 THEN published_date END) AS published_date,
+    MAX(CASE WHEN book_rn = 1 THEN genre END) AS genre,
+    MIN(TO_TIMESTAMP(bks_ts_ms / 1000)) AS book_added,
+    MAX(CASE WHEN author_rn = 1 THEN first_name END) AS author_first_name,
+    MAX(CASE WHEN author_rn = 1 THEN last_name END) AS author_last_name,
+    MAX(CASE WHEN author_rn = 1 THEN country END) AS author_country
+
+FROM joined_data
+GROUP BY book_nk, author_nk

@@ -4,4 +4,4 @@ SELECT
     tracking_number,
     gen_random_uuid() AS shipment_sk
 FROM
-    {{ source('staging_db','shipments').identifier }}
+    {{ source('landing_db','shipments') }}

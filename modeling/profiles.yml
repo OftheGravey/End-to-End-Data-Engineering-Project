@@ -8,4 +8,4 @@ book_store:
       password: postgres
       port: 5433
       dbname: dw_db
-      schema: dw_db
+      schema: staging_db

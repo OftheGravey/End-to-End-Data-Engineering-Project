@@ -1,5 +1,6 @@
 import requests
 import json 
+from time import sleep
 
 base_url = 'http://localhost:8083'
 headers = {'Content-Type': 'application/json'}
@@ -39,9 +40,9 @@ mysql_connector_config = {
 }
 
 if __name__ == "__main__":
+    # Setup store_db connector
     json_data = json.dumps(psql_connector_config)
     res = requests.post(f"{base_url}/connectors", headers=headers, data=json_data)
-
     if res.status_code == 201:
         print("Connection created")
     elif res.status_code == 409:
@@ -49,9 +50,9 @@ if __name__ == "__main__":
     else:
         raise Exception("Possible Failure,", res.status_code, res.reason)
     
+    # Setup shipping_db connector
     json_data = json.dumps(mysql_connector_config)
     res = requests.post(f"{base_url}/connectors", headers=headers, data=json_data)
-
     if res.status_code == 201:
         print("Connection created")
     elif res.status_code == 409:
@@ -59,9 +60,19 @@ if __name__ == "__main__":
     else:
         print(res.json())
         raise Exception("Possible Failure,", res.status_code, res.reason)
-        
-    res = requests.get(f"{base_url}/connectors/{mysql_connector_config['name']}/status")
 
+    print("Waiting 5 seconds for setup to complete.")
+    sleep(5)
+
+    # Check if connector were set up properly   
+    res = requests.get(f"{base_url}/connectors/{psql_connector_config['name']}/status")
+    if res.status_code != 200:
+        raise Exception("Possible Failure,", res.status_code, res.reason)
+    
+    print("Connector active:", res.json()['connector']['state'])
+    print(res.json())
+
+    res = requests.get(f"{base_url}/connectors/{mysql_connector_config['name']}/status")
     if res.status_code != 200:
         raise Exception("Possible Failure,", res.status_code, res.reason)
     

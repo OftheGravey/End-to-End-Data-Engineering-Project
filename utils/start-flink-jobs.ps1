@@ -3,6 +3,7 @@ $JOB_DIR="app/flink_jobs/jobs"
 
 # List of job file names to run
 $jobs = @(
+    "authors_stream.py",
     "books_stream.py",
     "customers_stream.py",
     "order_items_stream.py",

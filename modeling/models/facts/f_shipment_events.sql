@@ -11,21 +11,21 @@ SELECT
     gen_random_uuid() AS shipment_event_sk,
     to_timestamp(src.ts_ms / 1000) AS transaction_time
 FROM
-    {{ source('staging_db','shipments').identifier }} AS src
+    {{ source('landing_db','shipments') }} AS src
 INNER JOIN
-    {{ ref('d_shipments').identifier }} AS dsh
+    {{ ref('d_shipments') }} AS dsh
     ON src.shipment_id = dsh.shipment_id
-INNER JOIN {{ ref('d_orders').identifier }} AS dor
+INNER JOIN {{ ref('d_orders') }} AS dor
     ON
         src.order_id = dor.order_id
         AND to_timestamp(src.ts_ms / 1000) >= dor.valid_from
         AND to_timestamp(src.ts_ms / 1000) < dor.valid_to
-INNER JOIN {{ ref('d_carriers_services').identifier }} AS dcr
+INNER JOIN {{ ref('d_carriers_services') }} AS dcr
     ON
         src.carrier_id = dcr.carrier_id
         AND src.service_id = dcr.service_id
         AND to_timestamp(src.ts_ms / 1000) >= dcr.valid_from
         AND to_timestamp(src.ts_ms / 1000) < dcr.valid_to
 INNER JOIN
-    {{ ref('d_date').identifier }} AS ddd
+    {{ ref('d_date') }} AS ddd
     ON ddd.date = cast(to_timestamp(src.ts_ms / 1000) AS DATE)

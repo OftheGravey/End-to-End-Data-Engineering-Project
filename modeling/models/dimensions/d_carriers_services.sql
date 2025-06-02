@@ -10,8 +10,8 @@ WITH base_data AS (
         ser.estimated_days,
         ser.cost_estimate,
         GREATEST(car.ts_ms, ser.ts_ms) AS ts_ms
-    FROM {{ source('staging_db','carriers').identifier }} AS car
-    INNER JOIN {{ source('staging_db','shipping_services').identifier }} AS ser
+    FROM {{ source('landing_db','carriers') }} AS car
+    INNER JOIN {{ source('landing_db','shipping_services') }} AS ser
         ON car.carrier_id = ser.carrier_id
     WHERE
         car.op IN ('c', 'u')
@@ -25,33 +25,55 @@ scd2_with_row_numbers AS (
             PARTITION BY carrier_id, service_id
             ORDER BY ts_ms
         ) AS rn,
-        LAG(estimated_days) OVER scd2 AS prev_estimated_days,
-        LAG(cost_estimate) OVER scd2 AS prev_cost_estimate,
-        LEAD(ts_ms) OVER scd2 AS next_ts
+        LAG(estimated_days) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms
+        ) AS prev_estimated_days,
+        LAG(cost_estimate) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms
+        ) AS prev_cost_estimate,
+        LEAD(ts_ms) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms
+        ) AS next_ts,
+        FIRST_VALUE(carrier_name) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms DESC
+        ) AS latest_carrier_name,
+        FIRST_VALUE(contact_email) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms DESC
+        ) AS latest_contact_email,
+        FIRST_VALUE(phone) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms DESC
+        ) AS latest_phone,
+        FIRST_VALUE(tracking_url_template) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms DESC
+        ) AS latest_tracking_url_template,
+        FIRST_VALUE(service_name) OVER (
+            PARTITION BY carrier_id, service_id
+            ORDER BY ts_ms DESC
+        ) AS latest_service_name
     FROM base_data
-    WINDOW scd2 AS (
-        PARTITION BY carrier_id, service_id
-        ORDER BY ts_ms
-    )
 )
 
 SELECT
     carrier_id,
-    -- SCD 0
     service_id,
     estimated_days,
-    -- SCD 1
     cost_estimate,
-    GEN_RANDOM_UUID() AS carrier_service_sk,
-    MAX_BY(carrier_name, ts_ms) AS carrier_name,
-    MAX_BY(contact_email, ts_ms) AS carrier_contact_email,
-    MAX_BY(phone, ts_ms) AS carrier_phone,
-    -- SCD 2
-    MAX_BY(tracking_url_template, ts_ms) AS carrier_tracking_url_template,
-    MAX_BY(service_name, ts_ms) AS service_name,
-    -- SCD 2 helper cols
+    gen_random_uuid() AS carrier_service_sk,
+    MAX(latest_carrier_name) AS carrier_name,
+    MAX(latest_contact_email) AS carrier_contact_email,
+    MAX(latest_phone) AS carrier_phone,
+    MAX(latest_tracking_url_template) AS carrier_tracking_url_template,
+    MAX(latest_service_name) AS service_name,
     TO_TIMESTAMP(MIN(ts_ms) / 1000) AS valid_from,
     TO_TIMESTAMP(COALESCE(MIN(next_ts) / 1000, 253402300799)) AS valid_to
+
 FROM scd2_with_row_numbers
 WHERE
     rn = 1

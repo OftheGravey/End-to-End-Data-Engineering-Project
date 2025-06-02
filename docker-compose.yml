@@ -1,11 +1,3 @@
-x-flink-shared-vars: &flink-common-variables
-    - DW_USERNAME=${DW_USERNAME}
-    - DW_PASSWORD=${DW_PASSWORD}
-    - DW_HOSTNAME=${DW_HOSTNAME}
-    - DW_PORT=${DW_PORT}
-    - DW_DATABASE=${DW_DATABASE}
-    - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
-
 services:
   store-db:
     image: postgres:14.1-alpine
@@ -78,7 +70,6 @@ services:
       - "8081:8081"
     command: jobmanager
     environment:
-      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager 
@@ -97,11 +88,16 @@ services:
     command: taskmanager
     scale: 1
     environment:
-      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 9
+      - DW_USERNAME=${DW_USERNAME}
+      - DW_PASSWORD=${DW_PASSWORD}
+      - DW_HOSTNAME=${DW_HOSTNAME}
+      - DW_PORT=${DW_PORT}
+      - DW_DATABASE=${DW_DATABASE}
+      - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
   sql-client:
     image: flink-extractor:latest 
     command: sql-client.sh
@@ -110,11 +106,16 @@ services:
     depends_on:
       - jobmanager
     environment:
-      - <<: *flink-common-variables
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         rest.address: jobmanager
+      - DW_USERNAME=${DW_USERNAME}
+      - DW_PASSWORD=${DW_PASSWORD}
+      - DW_HOSTNAME=${DW_HOSTNAME}
+      - DW_PORT=${DW_PORT}
+      - DW_DATABASE=${DW_DATABASE}
+      - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
 volumes:
   shared-tmpfs:
     driver: local

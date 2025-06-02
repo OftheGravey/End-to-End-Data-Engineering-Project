@@ -10,21 +10,21 @@ SELECT
     to_timestamp(src.ts_ms / 1000) AS transaction_time,
     src.quantity * src.price_at_purchase * (1 - src.discount) AS price_total
 FROM
-    {{ source('staging_db','order_items').identifier }} AS src
+    {{ source('landing_db','order_items') }} AS src
 INNER JOIN
-    {{ source('staging_db','orders').identifier }} AS src_ord
+    {{ source('landing_db','orders') }} AS src_ord
     ON src.order_id = src_ord.order_id
-INNER JOIN {{ ref('d_orders').identifier }} AS dor
+INNER JOIN {{ ref('d_orders') }} AS dor
     ON
         src.order_id = dor.order_id
         AND to_timestamp(src.ts_ms / 1000) >= dor.valid_from
         AND to_timestamp(src.ts_ms / 1000) < dor.valid_to
-INNER JOIN {{ ref('d_customers').identifier }} AS dcu
+INNER JOIN {{ ref('d_customers') }} AS dcu
     ON
         src_ord.customer_id = dcu.customer_id
         AND to_timestamp(src.ts_ms / 1000) >= dcu.valid_from
         AND to_timestamp(src.ts_ms / 1000) < dcu.valid_to
-INNER JOIN {{ ref('d_books').identifier }} AS dbk ON src.book_id = dbk.book_nk
+INNER JOIN {{ ref('d_books') }} AS dbk ON src.book_id = dbk.book_nk
 INNER JOIN
-    {{ ref('d_date').identifier }} AS ddd
+    {{ ref('d_date') }} AS ddd
     ON ddd.date = cast(to_timestamp(src.ts_ms / 1000) AS DATE)

@@ -1,10 +1,10 @@
 version: 2
 
 sources:
-  - database: staging_db
+  - database: dw_db
     description: Unified source of CDC-extracted data from store and shipping systems captured via Debezium.
-    name: staging_db
-    schema: main
+    name: landing_db
+    schema: landing_db
     tables:
       - columns:
           - description: Primary key for the author.

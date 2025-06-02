@@ -13,7 +13,7 @@ SELECT
         ELSE to_timestamp(lead(ts_ms + 1) OVER scd2 / 1000)
     END AS valid_to
 FROM
-    {{ source('staging_db','orders').identifier }}
+    {{ source('landing_db','orders') }}
 WINDOW
     scd2 AS (
         PARTITION BY
