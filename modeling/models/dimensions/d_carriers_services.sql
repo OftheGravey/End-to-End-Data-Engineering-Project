@@ -65,7 +65,7 @@ SELECT
     service_id,
     estimated_days,
     cost_estimate,
-    gen_random_uuid() AS carrier_service_sk,
+    GEN_RANDOM_UUID() AS carrier_service_sk,
     MAX(latest_carrier_name) AS carrier_name,
     MAX(latest_contact_email) AS carrier_contact_email,
     MAX(latest_phone) AS carrier_phone,

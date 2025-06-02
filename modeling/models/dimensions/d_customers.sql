@@ -20,17 +20,60 @@ WITH base_data AS (
 scd2_with_row_numbers AS (
     SELECT
         *,
-        ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY ts_ms) AS rn,
-        LAG(email) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_email,
-        LAG(phone) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_phone,
-        LAG(street_address) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_street_address,
-        LAG(city) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_city,
-        LAG(state) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_state,
-        LAG(postal_code) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_postal_code,
-        LAG(country) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS prev_country,
-        LEAD(ts_ms) OVER (PARTITION BY customer_id ORDER BY ts_ms) AS next_ts,
-        FIRST_VALUE(first_name) OVER (PARTITION BY customer_id ORDER BY ts_ms DESC) AS latest_first_name,
-        FIRST_VALUE(last_name) OVER (PARTITION BY customer_id ORDER BY ts_ms DESC) AS latest_last_name
+        ROW_NUMBER() OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS rn,
+        LAG(email) OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS prev_email,
+        LAG(phone) OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS prev_phone,
+        LAG(street_address)
+            OVER (
+                PARTITION BY customer_id
+                ORDER BY ts_ms
+            )
+        AS prev_street_address,
+        LAG(city) OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS prev_city,
+        LAG(state) OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS prev_state,
+        LAG(postal_code)
+            OVER (
+                PARTITION BY customer_id
+                ORDER BY ts_ms
+            )
+        AS prev_postal_code,
+        LAG(country)
+            OVER (
+                PARTITION BY customer_id
+                ORDER BY ts_ms
+            )
+        AS prev_country,
+        LEAD(ts_ms) OVER (
+            PARTITION BY customer_id
+            ORDER BY ts_ms
+        ) AS next_ts,
+        FIRST_VALUE(first_name)
+            OVER (
+                PARTITION BY customer_id
+                ORDER BY ts_ms DESC
+            )
+        AS latest_first_name,
+        FIRST_VALUE(last_name)
+            OVER (
+                PARTITION BY customer_id
+                ORDER BY ts_ms DESC
+            )
+        AS latest_last_name
     FROM base_data
 )
 
@@ -46,7 +89,7 @@ SELECT
     state,
     postal_code,
     country,
-    gen_random_uuid() AS customer_sk,
+    GEN_RANDOM_UUID() AS customer_sk,
     MAX(latest_first_name) AS first_name,
     MAX(latest_last_name) AS last_name,
     -- SCD 2 Helper cols
