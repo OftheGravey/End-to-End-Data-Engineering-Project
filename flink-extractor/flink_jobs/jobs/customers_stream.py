@@ -26,7 +26,7 @@ def customers_stream(kafka_group: str):
             first_name VARCHAR(50),
             last_name VARCHAR(50),
             email VARCHAR(50),
-            phone VARCHAR(20),
+            phone VARCHAR(16),
             created_at TIMESTAMP,
             street_address VARCHAR(50),
             city VARCHAR(50),

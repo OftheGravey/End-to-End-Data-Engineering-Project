@@ -50,7 +50,7 @@ def books_stream(kafka_group: str):
         CAST(JSON_VALUE(payload, '$.after.book_id') AS INTEGER) AS book_id,
         CAST(JSON_VALUE(payload, '$.after.title') AS VARCHAR(50)) AS title,
         CAST(JSON_VALUE(payload, '$.after.author_id') AS INTEGER) AS author_id,
-        CAST(JSON_VALUE(payload, '$.after.isbn') AS VARCHAR(50)) AS isbn,
+        CAST(JSON_VALUE(payload, '$.after.isbn') AS VARCHAR(13)) AS isbn,
         base64_to_double(CAST(JSON_VALUE(payload, '$.after.price') AS STRING), 2) AS price,
         CAST(FROM_UNIXTIME((60 * 60 * 24) * CAST(JSON_VALUE(payload, '$.after.published_date') AS INTEGER)) AS DATE) AS published_date,
         CAST(JSON_VALUE(payload, '$.after.description') AS VARCHAR(500)) AS description,

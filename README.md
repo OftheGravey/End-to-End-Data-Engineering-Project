@@ -2,6 +2,7 @@
 An end-to-end data engineering project involving all stages of the data engineering pipeline.
 * MySQL & Postgres source databases
 * Kafka & Debezium for CDC ELT
+* Flink for streaming CDC
 * DBT for transforming data
 * Kimball's Dimensional modeling for data modeling
 
@@ -98,7 +99,10 @@ mysql-changes.shipping_db.shipment_events
 mysql-changes.shipping_db.shipments
 mysql-changes.shipping_db.shipping_services
 ```
-### Kafka Consumer
+### Flink Consumer
+Apache Flink is used to stream real-time changes to a postgres data warehouse. It pulls data from the above Kafka topics. Some light data processing is applied to change data types from the encoded debezium-json format. \
+Flink SQL has multiple methods of reading from Kafka-Debezium topics. I choose read the messages as raw JSON messages. This gave flexibility on what attributes I could extract from the messages. The `debezium-json` format seems to exclude the `op` field as an option for it's metadata (https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/debezium/). This field was important for downstream processes so that is why I choose to give up the convenience of the pre-processed format. 
+### Kafka Consumer (OLD)
 A custom Kafka consumer was created in `consumer`.
 This consumer is designed to subscribe to all the Kafka topics, receive data changes and write them to DuckDB after minor processing.
 Processing includes interpreting the data schema from Debezium, filtering out columns not needed in data analysis and obfuscating PII. As this is a ELT set-up, the processing is mainly done after data has landed into the OLAP environment.
@@ -108,7 +112,7 @@ A mock database editing client was created in `mock-db-client`.
 This producer is designed to insert and update junk data into the databases. This is used for system testing, to make sure data changes are being captured correctly.
 
 ## Data Processing
-After the data changes have landed into the staging.db (a DuckDB file) they are then processed into a Dimensional model using DBT. \
+After the data changes have landed into landing_db they are then processed into a Dimensional model using DBT. \
 The data modeling is done using Kimball's Dimensional modeling.
 ### Enterprise Data Warehouse Bus Matrix
 | Business Processes  | Grain                                 | Metrics       | Date | Books | Carrier Services | Customers | Orders | Shipments |
