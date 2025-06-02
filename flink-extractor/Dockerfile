@@ -13,7 +13,6 @@ WORKDIR /app
 RUN uv pip install --system -r pyproject.toml
 
 COPY flink_jobs/ /app/flink_jobs/
-COPY main.py /app/main.py
 COPY lib/ /opt/flink/lib/ 
 
 # Set environment variable for PyFlink

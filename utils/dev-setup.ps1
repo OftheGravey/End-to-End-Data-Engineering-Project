@@ -7,15 +7,19 @@ function Set-Up-Env {
         return
     }
     cd $Component
-    uv venv
+    if (-not (Test-Path ".venv" -PathType Container)) {
+        uv venv
+    }
     uv sync
+    cd ..
 }
 
 function Build-Flink-Image {
     $FLINK_EXTRACTOR_PATH="flink-extractor"
     Set-Up-Env -Component $FLINK_EXTRACTOR_PATH
     cd $FLINK_EXTRACTOR_PATH
-    docker build -t FLINK_EXTRACTOR_PATH .
+    docker build -t $FLINK_EXTRACTOR_PATH .
+    cd ..
 }
 
 # Check for preqs
