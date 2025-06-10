@@ -2,7 +2,7 @@ import requests
 import json 
 from time import sleep
 
-base_url = 'http://localhost:8083'
+base_url = 'http://localhost:8010'
 headers = {'Content-Type': 'application/json'}
 psql_connector_config = {
     "name": "postgresql-connector",
