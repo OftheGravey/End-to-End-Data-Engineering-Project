@@ -1,7 +1,7 @@
 -- SCHEMA: shipping_system (MySQL)
 
 -- CARRIERS
-CREATE TABLE carriers (
+CREATE TABLE IF NOT EXISTS carriers (
     carrier_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     contact_email VARCHAR(100),
@@ -11,7 +11,7 @@ CREATE TABLE carriers (
 );
 
 -- SHIPPING SERVICES
-CREATE TABLE shipping_services (
+CREATE TABLE IF NOT EXISTS shipping_services (
     service_id INT AUTO_INCREMENT PRIMARY KEY,
     carrier_id INT NOT NULL,
     service_name VARCHAR(100) NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE shipping_services (
 );
 
 -- SHIPMENTS
-CREATE TABLE shipments (
+CREATE TABLE IF NOT EXISTS shipments (
     shipment_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL, -- corresponds to order_id in PostgreSQL (not FK constraint)
     carrier_id INT NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE shipments (
 );
 
 -- SHIPMENT EVENTS (status history)
-CREATE TABLE shipment_events (
+CREATE TABLE IF NOT EXISTS shipment_events (
     event_id INT AUTO_INCREMENT PRIMARY KEY,
     shipment_id INT NOT NULL,
     status ENUM('created', 'in_transit', 'delivered', 'delayed', 'returned', 'cancelled') NOT NULL,

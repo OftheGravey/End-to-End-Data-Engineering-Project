@@ -157,7 +157,6 @@ def main_loop():
             update_random_order_status()
         elif action == "update_shipment":
             update_random_shipment_status()
-        time.sleep(1)
 
 
 if __name__ == "__main__":

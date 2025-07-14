@@ -1,12 +1,14 @@
 import os 
 import sys
+from dataclasses import dataclass
 
 DW_DATABASE=os.environ['DW_DATABASE']
 DW_USERNAME=os.environ['DW_USERNAME']
 DW_PASSWORD=os.environ['DW_PASSWORD']
 DW_HOSTNAME=os.environ['DW_HOSTNAME']
 DW_PORT=os.environ['DW_PORT']
-DW_SCHEMA='landing_db'
+DW_BRONZE_SCHEMA='landing_db'
+DW_SILVER_SCHEMA='staging_db'
 BOOTSTRAP_SERVERS=os.environ['BOOTSTRAP_SERVERS']
 
 STREAM_KAFKA_GROUP = 'etlStream-prod-1'

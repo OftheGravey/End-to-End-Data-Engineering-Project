@@ -4,7 +4,7 @@ CREATE SCHEMA modeling_db;
 
 -- store_db
 -- AUTHORS
-CREATE TABLE IF NOT EXISTS landing_db.authors (
+CREATE TABLE IF NOT EXISTS landing_db.authors_sink (
     author_id INTEGER,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS landing_db.authors (
 );
 
 -- BOOKS
-CREATE TABLE IF NOT EXISTS landing_db.books (
+CREATE TABLE IF NOT EXISTS landing_db.books_sink (
     book_id INTEGER,
     title TEXT NOT NULL,
     author_id INTEGER NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS landing_db.books (
 );
 
 -- CUSTOMERS
-CREATE TABLE IF NOT EXISTS landing_db.customers (
+CREATE TABLE IF NOT EXISTS landing_db.customers_sink (
     customer_id INTEGER,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS landing_db.customers (
 );
 
 -- ORDERS
-CREATE TABLE IF NOT EXISTS landing_db.orders (
+CREATE TABLE IF NOT EXISTS landing_db.orders_sink (
     order_id INTEGER,
     customer_id INTEGER NOT NULL,
     order_date TIMESTAMP,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS landing_db.orders (
 );
 
 -- ORDER_ITEMS
-CREATE TABLE IF NOT EXISTS landing_db.order_items (
+CREATE TABLE IF NOT EXISTS landing_db.order_items_sink (
     order_item_id INTEGER,
     order_id INTEGER NOT NULL,
     book_id INTEGER NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS landing_db.order_items (
 
 -- shipping_db
 -- CARRIERS
-CREATE TABLE IF NOT EXISTS landing_db.carriers (
+CREATE TABLE IF NOT EXISTS landing_db.carriers_sink (
     carrier_id INTEGER,
     name VARCHAR,
     contact_email VARCHAR,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS landing_db.carriers (
 );
 
 -- SHIPPING SERVICES
-CREATE TABLE IF NOT EXISTS landing_db.shipping_services (
+CREATE TABLE IF NOT EXISTS landing_db.shipping_services_sink (
     service_id INTEGER,
     carrier_id INTEGER,
     service_name VARCHAR,
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS landing_db.shipping_services (
 );
 
 -- SHIPMENTS
-CREATE TABLE IF NOT EXISTS landing_db.shipments (
+CREATE TABLE IF NOT EXISTS landing_db.shipments_sink (
     shipment_id INTEGER,
     order_id INTEGER,
     carrier_id INTEGER,
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS landing_db.shipments (
 );
 
 -- SHIPMENT EVENTS
-CREATE TABLE IF NOT EXISTS landing_db.shipment_events (
+CREATE TABLE IF NOT EXISTS landing_db.shipment_events_sink (
     event_id INTEGER,
     shipment_id INTEGER,
     status VARCHAR,
