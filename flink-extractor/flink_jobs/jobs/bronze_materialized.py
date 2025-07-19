@@ -10,17 +10,18 @@ from common.bronze_tables.shipping_services_stream import ShippingServicesDataSt
 from common.bronze_tables.base_stream import KafkaDataStreamReader
 
 from pyflink.table import EnvironmentSettings, TableEnvironment
-from common.functions import base64_to_double
+from common.functions import base64_to_double, uuid_gen
 
 KAFKA_GROUP_NAME = 'BRONZE_SINK'
 
 if __name__ == '__main__':
     env_settings = EnvironmentSettings.in_streaming_mode()
-    table_env = TableEnvironment.create(environment_settings=env_settings)
+    t_env = TableEnvironment.create(environment_settings=env_settings)
     
-    table_env.create_temporary_function("base64_to_double", base64_to_double)
+    t_env.create_temporary_function("base64_to_double", base64_to_double)
+    t_env.create_temporary_function("uuid_gen", uuid_gen)
     args = {
-        'table_env': table_env,
+        't_env': t_env,
         'kafka_group': KAFKA_GROUP_NAME,
         'is_materialized': True
     }

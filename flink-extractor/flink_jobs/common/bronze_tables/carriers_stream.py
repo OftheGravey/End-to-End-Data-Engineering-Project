@@ -3,9 +3,9 @@ from common.bronze_tables.base_stream import KafkaDataStreamReader
 TOPIC = "mysql-changes.shipping_db.carriers"
 
 class CarriersDataStreamReader(KafkaDataStreamReader):
-    def __init__(self, table_env, kafka_group, is_materialized):
+    def __init__(self, t_env, kafka_group, is_materialized):
         super().__init__(
-            TOPIC, "carriers", "mysql", table_env, kafka_group, is_materialized
+            TOPIC, "carriers", "mysql", t_env, kafka_group, is_materialized
         )
 
     def parse_kafka_create_rows(self):

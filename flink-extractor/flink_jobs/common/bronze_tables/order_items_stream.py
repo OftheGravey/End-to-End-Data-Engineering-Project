@@ -3,9 +3,9 @@ from common.bronze_tables.base_stream import KafkaDataStreamReader
 TOPIC = "pg-changes.public.order_items"
 
 class OrderItemsDataStreamReader(KafkaDataStreamReader):
-    def __init__(self, table_env, kafka_group, is_materialized):
+    def __init__(self, t_env, kafka_group, is_materialized):
         super().__init__(
-            TOPIC, "order_items", "postgres", table_env, kafka_group, is_materialized
+            TOPIC, "order_items", "postgres", t_env, kafka_group, is_materialized
         )
 
     def parse_kafka_create_rows(self):

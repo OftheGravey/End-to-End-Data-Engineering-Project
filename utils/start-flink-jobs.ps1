@@ -3,7 +3,7 @@ $JOB_DIR="app/flink_jobs/jobs"
 
 # List of job file names to run
 $jobs = @(
-    "bronze_materialized.py"
+    "silver_tables.py"
 )
 
 # Loop through and run each job in the container

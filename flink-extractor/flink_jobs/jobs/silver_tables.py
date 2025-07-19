@@ -1,29 +1,58 @@
-from common.bronze_tables import (
-    books_stream,
-    order_items_stream,
-    orders_stream,
-    authors_stream,
-    carriers_stream,
-    customers_stream,
-    shipment_events_stream,
-    shipments_stream,
-    shipping_services_stream
-)
-from pyflink.table import EnvironmentSettings, TableEnvironment
+from common.bronze_tables.books_stream import BooksDataStreamReader
+from common.bronze_tables.order_items_stream import OrderItemsDataStreamReader
+from common.bronze_tables.orders_stream import OrdersDataStreamReader
+from common.bronze_tables.authors_stream import AuthorsDataStreamReader
+from common.bronze_tables.carriers_stream import CarriersDataStreamReader
+from common.bronze_tables.customers_stream import CustomersDataStreamReader
+from common.bronze_tables.shipment_events_stream import ShipmentEventsDataStreamReader
+from common.bronze_tables.shipments_stream import ShipmentsDataStreamReader
+from common.bronze_tables.shipping_services_stream import ShippingServicesDataStreamReader
+from common.bronze_tables.base_stream import KafkaDataStreamReader
+from common.silver_tables.base_sink import BaseDataSink
 
-KAFKA_GROUP_NAME = 'BRONZE_SINK'
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import EnvironmentSettings, StreamTableEnvironment
+from common.functions import base64_to_double, uuid_gen
+
+KAFKA_GROUP_NAME = 'DEVELOPMENT'
 
 if __name__ == '__main__':
+    # 1. Create the low-level DataStream execution environment
+    exec_env = StreamExecutionEnvironment.get_execution_environment()
+
+    # 2. Create a StreamTableEnvironment *with* that execution environment
     env_settings = EnvironmentSettings.in_streaming_mode()
-    table_env = TableEnvironment.create(environment_settings=env_settings)
+    t_env = StreamTableEnvironment.create(exec_env, environment_settings=env_settings)
     
-    # Register topics as tables
-    books_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    order_items_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    orders_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    authors_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    carriers_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    customers_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    shipment_events_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    shipments_stream.create_table(table_env, KAFKA_GROUP_NAME)
-    shipping_services_stream.create_table(table_env, KAFKA_GROUP_NAME)
+    t_env.create_temporary_function("base64_to_double", base64_to_double)
+    t_env.create_temporary_function("uuid_gen", uuid_gen)
+    args = {
+        't_env': t_env,
+        'kafka_group': KAFKA_GROUP_NAME,
+        'is_materialized': False
+    }
+
+    streams: list[KafkaDataStreamReader] = [
+        # BooksDataStreamReader(**args),
+        # OrderItemsDataStreamReader(**args),
+        OrdersDataStreamReader(**args),
+        # AuthorsDataStreamReader(**args),
+        # CarriersDataStreamReader(**args),
+        # CustomersDataStreamReader(**args),
+        # ShipmentEventsDataStreamReader(**args),
+        # ShipmentsDataStreamReader(**args),
+        # ShippingServicesDataStreamReader(**args)
+    ]
+
+    # Process stream into bronze tables
+    for stream in streams:
+        stream.create_topic_table()
+        stream.create_formatted_table()
+        stream.insert_into_landing_table()
+
+    orders = BaseDataSink('d_orders', t_env)
+    orders.insert_records()
+
+    
+
+    

@@ -4,9 +4,9 @@ TOPIC = "mysql-changes.shipping_db.shipping_services"
 
 
 class ShippingServicesDataStreamReader(KafkaDataStreamReader):
-    def __init__(self, table_env, kafka_group, is_materialized):
+    def __init__(self, t_env, kafka_group, is_materialized):
         super().__init__(
-            TOPIC, "shipping_services", "mysql", table_env, kafka_group, is_materialized
+            TOPIC, "shipping_services", "mysql", t_env, kafka_group, is_materialized
         )
 
     def parse_kafka_create_rows(self):

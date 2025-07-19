@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 
 
 class KafkaDataStreamReader(ABC):
-    table_env: TableEnvironment
+    t_env: TableEnvironment
     bootstrap_servers: str
     debezium_metadata_create_table: str
     debezium_metadata_insert_into: str
@@ -27,7 +27,8 @@ class KafkaDataStreamReader(ABC):
     dw_port: str
     dw_bronze_schema: str
     base_table_name: str
-    kafka_topic: str
+    source_kafka_topic: str
+    sink_kafka_topic: str
     kafka_group: str
     is_materialized: bool
 
@@ -36,7 +37,7 @@ class KafkaDataStreamReader(ABC):
         kafka_topic: str,
         base_table_name: str,
         source_database_type: str,
-        table_env: TableEnvironment,
+        t_env: TableEnvironment,
         kafka_group: str,
         is_materialized: bool
     ):
@@ -47,12 +48,13 @@ class KafkaDataStreamReader(ABC):
             kafka_topic (str): Kafka topic string for table being streamed
             base_table_name (str): Name of table in source system
             source_database_type (str): Source database
-            table_env (TableEnvironment): Flink table environment
+            t_env (TableEnvironment): Flink table environment
             kafka_group (str): Kafka group used for stream
             is_materialized (bool): Is feeding a materialized table in DW for bronze records
         """
-        self.table_env = table_env
-        self.kafka_topic = kafka_topic
+        self.t_env = t_env
+        self.source_kafka_topic = kafka_topic
+        self.sink_kafka_topic = f"{kafka_topic}.structured"
         self.kafka_group = kafka_group
         self.base_table_name = base_table_name
         self.is_materialized = is_materialized
@@ -85,22 +87,13 @@ class KafkaDataStreamReader(ABC):
         self.kafka_source_table_name = f"{base_table_name}_source"
         self.formatted_table_name = f"{base_table_name}_formatted"
 
-        self.dw_connector = f""" (
-            'connector' = 'jdbc',
-            'url' = 'jdbc:postgresql://{DW_HOSTNAME}:{DW_PORT}/{DW_DATABASE}',
-            'table-name' = '{DW_BRONZE_SCHEMA}.{self.base_table_name}_sink',
-            'driver' = 'org.postgresql.Driver',
-            'username' = '{DW_USERNAME}',
-            'password' = '{DW_PASSWORD}'
-        )"""
-
     def create_topic_table(self):
-        self.table_env.execute_sql(f"""
+        self.t_env.execute_sql(f"""
             CREATE TABLE {self.kafka_source_table_name} (
                 payload STRING
             ) WITH (
                 'connector' = 'kafka',
-                'topic' = '{self.kafka_topic}',
+                'topic' = '{self.sink_kafka_topic}',
                 'properties.bootstrap.servers' = '{self.bootstrap_servers}',
                 'properties.group.id' = '{self.kafka_group}',
                 'format' = 'json',
@@ -110,7 +103,7 @@ class KafkaDataStreamReader(ABC):
 
     def insert_into_landing_table(self):
         parse_kafka_row_sql = self.parse_kafka_insert_rows()
-        self.table_env.execute_sql(f"""
+        self.t_env.execute_sql(f"""
         INSERT INTO {self.formatted_table_name}
         SELECT 
             {parse_kafka_row_sql},
@@ -119,17 +112,33 @@ class KafkaDataStreamReader(ABC):
 
     def create_formatted_table(self):
         parse_kafka_row_sql = self.parse_kafka_create_rows()
+        if not self.is_materialized:
+            dw_connector = f""" (
+                'connector' = 'kafka',
+                'topic' = '{self.sink_kafka_topic}',
+                'properties.bootstrap.servers' = '{self.bootstrap_servers}',
+                'properties.group.id' = '{self.kafka_group}',
+                'format' = 'json',
+                'scan.startup.mode' = 'earliest-offset'
+            )"""
+        else:
+            dw_connector = f""" (
+                'connector' = 'jdbc',
+                'url' = 'jdbc:postgresql://{self.dw_hostname}:{self.dw_port}/{self.dw_database}',
+                'table-name' = '{self.dw_bronze_schema}.{self.base_table_name}_sink',
+                'driver' = 'org.postgresql.Driver',
+                'username' = '{self.dw_username}',
+                'password' = '{self.dw_password}'
+            )"""
+
         sql = f"""
         CREATE TABLE {self.formatted_table_name} (
             {parse_kafka_row_sql},
             {self.debezium_metadata_create_table}
-        )
+        ) WITH {dw_connector};
         """
-        if self.is_materialized:
-            sql += f"WITH {self.dw_connector}"
-        sql += ';'
         
-        self.table_env.execute_sql(sql)
+        self.t_env.execute_sql(sql)
 
     @abstractmethod
     def parse_kafka_create_rows(self):

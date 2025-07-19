@@ -3,9 +3,9 @@ from common.bronze_tables.base_stream import KafkaDataStreamReader
 TOPIC = "pg-changes.public.authors"
 
 class AuthorsDataStreamReader(KafkaDataStreamReader):
-    def __init__(self, table_env, kafka_group, is_materialized):
+    def __init__(self, t_env, kafka_group, is_materialized):
         super().__init__(
-            TOPIC, "authors", "postgres", table_env, kafka_group, is_materialized
+            TOPIC, "authors", "postgres", t_env, kafka_group, is_materialized
         )
 
     def parse_kafka_create_rows(self):
