@@ -2,6 +2,8 @@ CREATE SCHEMA landing_db;
 CREATE SCHEMA staging_db;
 CREATE SCHEMA modeling_db;
 
+CREATE DATABASE dagster;
+
 -- store_db
 -- AUTHORS
 CREATE TABLE IF NOT EXISTS landing_db.authors_sink (
@@ -161,3 +163,15 @@ CREATE TABLE IF NOT EXISTS landing_db.shipment_events_sink (
     connector_version TEXT,
     transaction_id TEXT
 );
+
+
+-- Dimension Tables:
+CREATE TABLE IF NOT EXISTS modeling_db.d_orders (
+    orderId INTEGER, 
+    status VARCHAR,
+    shippingMethod VARCHAR,
+    orderDate DATE,
+    orderSk VARCHAR,
+    validFrom TIMESTAMP,
+    validTo TIMESTAMP
+)

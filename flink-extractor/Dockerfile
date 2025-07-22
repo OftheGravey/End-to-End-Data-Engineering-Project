@@ -1,23 +1,27 @@
-# Start from the official Flink image
+FROM maven:3.8.5-openjdk-17-slim AS builder
+
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# Verify the JAR was created and show its contents
+RUN ls -la /build/target/ && \
+    if [ -f /build/target/flink-extractor-1.0-SNAPSHOT.jar ]; then \
+        echo "JAR created successfully" && \
+        jar tf /build/target/flink-extractor-1.0-SNAPSHOT.jar | head -20; \
+    else \
+        echo "JAR not found!" && exit 1; \
+    fi
+
 FROM flink:2.0.0-scala_2.12-java21
 
-# Install Python and PyFlink
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip && \
-    ln -s $(which python3) /usr/bin/python && \
-    pip install uv
+# Copy the JAR file
+COPY --from=builder /build/target/flink-extractor-1.0-SNAPSHOT.jar /opt/flink/usrlib/
 
-COPY pyproject.toml uv.lock /app/
-WORKDIR /app
-
-RUN uv pip install --system -r pyproject.toml
-
-COPY flink_jobs/ /app/flink_jobs/
-COPY lib/ /opt/flink/lib/ 
-
-# Set environment variable for PyFlink
-ENV PATH="/app/.venv/bin:$PATH"
-ENV PYFLINK_PYTHON_EXECUTABLE=/usr/bin/python3
-ENV PYTHONPATH=/app/flink_jobs
+# Verify the JAR was copied
+RUN ls -la /opt/flink/usrlib/
 
 WORKDIR /
