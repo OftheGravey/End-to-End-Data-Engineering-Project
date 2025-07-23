@@ -1,18 +1,14 @@
-package com.extractor.flink.jobs;
+package com.extractor.flink.jobs.dimensions;
 
-import java.io.Serializable;
 import java.sql.Date;
-import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.util.UUID;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.connector.jdbc.JdbcConnectionOptions;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
-import org.apache.flink.connector.jdbc.core.datastream.Jdbc;
 import org.apache.flink.connector.jdbc.core.datastream.sink.JdbcSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
@@ -26,9 +22,8 @@ import com.extractor.flink.functions.DebeziumSourceRecord;
 import com.extractor.flink.functions.KafkaProperties;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
-import com.extractor.flink.jobs.OrdersDimensionJob.JsonToOrderMapper;
-import com.extractor.flink.jobs.OrdersDimensionJob.OrderDimension;
-import com.extractor.flink.jobs.OrdersDimensionJob.OrdersSCD2ProcessFunction;
+import com.extractor.flink.jobs.landing.OrdersLandingJob;
+import com.extractor.flink.utils.DWConnectionCommonOptions;
 
 public class OrdersDimensionJob {
 
@@ -106,12 +101,8 @@ public class OrdersDimensionJob {
         }
     }
 
-    /**
-     * @param args
-     * @throws Exception
-     */
     public static void main(String[] args) throws Exception {
-        String sourceTopic = OrdersProcessed.sinkTopic;
+        String sourceTopic = OrdersLandingJob.sinkTopic;
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -155,16 +146,11 @@ public class OrdersDimensionJob {
                 .withQueryStatement(
                         "insert into modeling_db.d_orders (orderId, status, shippingMethod, orderDate, orderSk, validFrom, validTo) values (?, ?, ?, ?, ?, ?, ?)",
                         sinkStatement)
-                .buildAtLeastOnce(new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
-                        .withUrl("jdbc:postgresql://postgres-dw:5433/dw_db")
-                        .withDriverName("org.postgresql.Driver")
-                        .withUsername("postgres")
-                        .withPassword("postgres")
-                        .build());
+                .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
 
         scd2Stream.sinkTo(sink);
 
-        env.execute("Silver Table Job");
+        env.execute("d_orders job");
 
     }
 }

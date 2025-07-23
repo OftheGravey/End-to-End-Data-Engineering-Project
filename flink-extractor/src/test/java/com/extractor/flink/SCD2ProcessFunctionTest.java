@@ -6,11 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -19,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.extractor.flink.functions.DebeziumSourceRecord;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
-import com.extractor.flink.jobs.OrdersDimensionJob.OrdersSCD2ProcessFunction;
 
 public class SCD2ProcessFunctionTest {
 

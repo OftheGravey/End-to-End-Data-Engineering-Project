@@ -1,15 +1,16 @@
-package com.extractor.flink.jobs;
+package com.extractor.flink.jobs.landing;
 
 import com.extractor.flink.functions.KafkaProperties;
 import com.extractor.flink.functions.PostgresDebeziumColumns;
+import com.extractor.flink.utils.TopicNameBuilder;
+
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-public class OrdersProcessed {
-
-    static String sourceTopic = "pg-changes.public.orders";
-    static String sinkTopic = "parsed.orders";
-    static String groupId = "test2";
+public class AuthorsLandingJob {
+    static String sourceTopic = "pg-changes.public.authors";
+    public static String sinkTopic = TopicNameBuilder.build("store.authors.landing");
+    static String groupId = System.getenv("GROUP_ID");
     public static void main(String[] args) throws Exception {
 
         // Set up execution environment
@@ -20,7 +21,7 @@ public class OrdersProcessed {
         String createTableDebeziumColumns = PostgresDebeziumColumns.createTableFormat();
 
         String createSourceTableSql = String.format("""
-            CREATE TABLE orders (
+            CREATE TABLE authors (
                 payload STRING
             ) %s
             """, sourceProperties);
@@ -30,12 +31,12 @@ public class OrdersProcessed {
         String sinkProperties = KafkaProperties.build(sinkTopic, groupId);
 
         String createSinkTableSql = String.format("""
-                CREATE TABLE orders_processed (
-                    order_id INTEGER,
-                    customer_id INTEGER NOT NULL,
-                    order_date TIMESTAMP,
-                    status VARCHAR(20) NOT NULL,
-                    shipping_method VARCHAR(20),
+                CREATE TABLE authors_processed (
+                    author_id INTEGER,
+                    first_name VARCHAR(255),
+                    last_name VARCHAR(255),
+                    biography VARCHAR(2048),
+                    country VARCHAR(255),
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
@@ -44,15 +45,15 @@ public class OrdersProcessed {
 
         String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
         String insertSinkSql = String.format("""
-                INSERT INTO orders_processed
+                INSERT INTO authors_processed
                 SELECT 
-                    CAST(JSON_VALUE(payload, '$.after.order_id') AS INTEGER) AS order_id,
-                    CAST(JSON_VALUE(payload, '$.after.customer_id') AS INTEGER) AS customer_id,
-                    CAST(FROM_UNIXTIME(CAST(JSON_VALUE(payload, '$.after.order_date') AS BIGINT)/1000000) AS TIMESTAMP) AS order_date,
-                    CAST(JSON_VALUE(payload, '$.after.status') AS VARCHAR(20)) AS status,
-                    CAST(JSON_VALUE(payload, '$.after.shipping_method') AS VARCHAR(20)) AS shipping_method,
+                    CAST(JSON_VALUE(payload, '$.after.author_id') AS INTEGER) AS author_id,
+                    CAST(JSON_VALUE(payload, '$.after.first_name') AS VARCHAR(50)) AS first_name,
+                    CAST(JSON_VALUE(payload, '$.after.last_name') AS VARCHAR(50)) AS last_name,
+                    CAST(JSON_VALUE(payload, '$.after.biography') AS VARCHAR(50)) AS biography,
+                    CAST(JSON_VALUE(payload, '$.after.country') AS VARCHAR(50)) AS country,
                     %s
-                FROM orders
+                FROM authors
                 """, insertTableDebeziumColumns);
         System.out.println(insertSinkSql);
         tableEnv.executeSql(insertSinkSql);
