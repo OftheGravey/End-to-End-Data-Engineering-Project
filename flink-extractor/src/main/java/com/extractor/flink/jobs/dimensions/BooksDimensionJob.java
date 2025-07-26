@@ -162,6 +162,9 @@ public class BooksDimensionJob {
 
         private double base64ToScaledDouble(String base64String, int scale) {
             byte[] decoded = Base64.getDecoder().decode(base64String);
+            if (decoded.length < 8) {
+                return 0.0;
+            }
             double value = ByteBuffer.wrap(decoded).getDouble();
             BigDecimal bd = BigDecimal.valueOf(value)
                     .setScale(scale, RoundingMode.HALF_UP);

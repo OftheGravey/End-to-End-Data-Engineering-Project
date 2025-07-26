@@ -46,7 +46,6 @@ public class BooksLandingJob {
                 """, createTableDebeziumColumns, sinkProperties);
         System.out.println(createSinkTableSql);
         tableEnv.executeSql(createSinkTableSql);
-
         String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
         String insertSinkSql = String.format("""
                 INSERT INTO books_processed

@@ -1,10 +1,10 @@
 FROM maven:3.8.5-openjdk-17-slim AS builder
 
 WORKDIR /build
-COPY pom.xml .
+COPY flink-extractor/pom.xml .
 RUN mvn dependency:go-offline -B
 
-COPY src ./src
+COPY flink-extractor/src src
 RUN mvn clean package -DskipTests
 
 # Verify the JAR was created and show its contents
