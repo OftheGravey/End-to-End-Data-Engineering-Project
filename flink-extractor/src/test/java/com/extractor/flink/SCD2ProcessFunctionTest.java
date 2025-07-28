@@ -4,10 +4,13 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.util.KeyedOneInputStreamOperatorTestHarness;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.junit.jupiter.api.AfterEach;
 
 import java.sql.Timestamp;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
+import org.apache.flink.streaming.api.operators.KeyedProcessOperator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,7 +19,7 @@ import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
 
 public class SCD2ProcessFunctionTest {
-
+    private static final long END_OF_TIME = 253402300799000L;
     private KeyedOneInputStreamOperatorTestHarness<Integer, DebeziumSourceRecord, TargetDimensionRecord> testHarness;
     private TestSCD2ProcessFunction processFunction;
 
@@ -32,8 +35,8 @@ public class SCD2ProcessFunctionTest {
         processFunction = new TestSCD2ProcessFunction();
         
         // Create the keyed process operator with explicit types
-        org.apache.flink.streaming.api.operators.KeyedProcessOperator<Integer, DebeziumSourceRecord, TargetDimensionRecord> operator = 
-            new org.apache.flink.streaming.api.operators.KeyedProcessOperator<>(processFunction);
+        KeyedProcessOperator<Integer, DebeziumSourceRecord, TargetDimensionRecord> operator = 
+            new KeyedProcessOperator<>(processFunction);
         
         testHarness = new KeyedOneInputStreamOperatorTestHarness<>(
                 operator,
@@ -66,9 +69,9 @@ public class SCD2ProcessFunctionTest {
         ConcurrentLinkedQueue<Object> output = testHarness.getOutput();
         assertEquals(1, output.size());
 
-        TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
+        TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
         assertEquals(new Timestamp(1000L), outputRecord.validFrom);
-        assertEquals(new Timestamp(1001L), outputRecord.validTo);
+        assertEquals(new Timestamp(END_OF_TIME), outputRecord.validTo);
     }
 
     @Test
@@ -104,29 +107,29 @@ public class SCD2ProcessFunctionTest {
         assertEquals(5, output.size());
 
         // First record
-        TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), firstRecord.validFrom);
-        assertEquals(new Timestamp(1001L), firstRecord.validTo);
+        TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record1.tsMs), firstRecord.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), firstRecord.validTo);
 
         // First record gets closed when second arrives
-        TargetDimensionRecord closedRecord1 = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), closedRecord1.validFrom);
-        assertEquals(new Timestamp(2000L), closedRecord1.validTo);
+        TargetDimensionRecord closedRecord1 = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record1.tsMs), closedRecord1.validFrom);
+        assertEquals(new Timestamp(record2.tsMs - 1), closedRecord1.validTo);
 
         // Second record
-        TargetDimensionRecord secondRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), secondRecord.validFrom);
-        assertEquals(new Timestamp(2001L), secondRecord.validTo);
+        TargetDimensionRecord secondRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record2.tsMs), secondRecord.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), secondRecord.validTo);
 
         // Second record gets closed when third arrives
-        TargetDimensionRecord closedRecord2 = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), closedRecord2.validFrom);
-        assertEquals(new Timestamp(3000L), closedRecord2.validTo);
+        TargetDimensionRecord closedRecord2 = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record2.tsMs), closedRecord2.validFrom);
+        assertEquals(new Timestamp(record3.tsMs - 1), closedRecord2.validTo);
 
         // Third record
-        TargetDimensionRecord thirdRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(3000L), thirdRecord.validFrom);
-        assertEquals(new Timestamp(3001L), thirdRecord.validTo);
+        TargetDimensionRecord thirdRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record3.tsMs), thirdRecord.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), thirdRecord.validTo);
     }
 
     @Test
@@ -163,29 +166,29 @@ public class SCD2ProcessFunctionTest {
         assertEquals(5, output.size());
 
         // First record (1000L) - no previous record to close
-        TargetDimensionRecord firstProcessed = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), firstProcessed.validFrom);
-        assertEquals(new Timestamp(1001L), firstProcessed.validTo);
+        TargetDimensionRecord firstProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record2.tsMs), firstProcessed.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), firstProcessed.validTo);
 
         // First record gets closed when second arrives (validTo becomes 2000L)
-        TargetDimensionRecord firstClosed = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), firstClosed.validFrom);
-        assertEquals(new Timestamp(2000L), firstClosed.validTo);
+        TargetDimensionRecord firstClosed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record2.tsMs), firstClosed.validFrom);
+        assertEquals(new Timestamp(record3.tsMs - 1), firstClosed.validTo);
 
         // Second record (2000L)
-        TargetDimensionRecord secondProcessed = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), secondProcessed.validFrom);
-        assertEquals(new Timestamp(2001L), secondProcessed.validTo);
+        TargetDimensionRecord secondProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record3.tsMs), secondProcessed.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), secondProcessed.validTo);
 
         // Second record gets closed when third arrives (validTo becomes 3000L)
-        TargetDimensionRecord secondClosed = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), secondClosed.validFrom);
-        assertEquals(new Timestamp(3000L), secondClosed.validTo);
+        TargetDimensionRecord secondClosed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record3.tsMs), secondClosed.validFrom);
+        assertEquals(new Timestamp(record1.tsMs - 1), secondClosed.validTo);
 
         // Third record (3000L)
-        TargetDimensionRecord thirdProcessed = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(3000L), thirdProcessed.validFrom);
-        assertEquals(new Timestamp(3001L), thirdProcessed.validTo);
+        TargetDimensionRecord thirdProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record1.tsMs), thirdProcessed.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), thirdProcessed.validTo);
     }
 
     @Test
@@ -200,8 +203,8 @@ public class SCD2ProcessFunctionTest {
         deleteRecord.op = "d"; // delete
 
         // Process records
-        testHarness.processElement(insertRecord, 1000L);
-        testHarness.processElement(deleteRecord, 2000L);
+        testHarness.processElement(insertRecord, insertRecord.tsMs);
+        testHarness.processElement(deleteRecord, deleteRecord.tsMs);
 
         // Advance time to trigger timer
         testHarness.setProcessingTime(13000L);
@@ -211,19 +214,19 @@ public class SCD2ProcessFunctionTest {
         assertEquals(3, output.size());
 
         // First record
-        TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), firstRecord.validFrom);
-        assertEquals(new Timestamp(1001L), firstRecord.validTo);
+        TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(insertRecord.tsMs), firstRecord.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), firstRecord.validTo);
 
         // Insert record gets closed by delete
-        TargetDimensionRecord closedRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), closedRecord.validFrom);
-        assertEquals(new Timestamp(2000L), closedRecord.validTo);
+        TargetDimensionRecord closedRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(insertRecord.tsMs), closedRecord.validFrom);
+        assertEquals(new Timestamp(deleteRecord.tsMs - 1), closedRecord.validTo);
 
         // Delete record - should have END_OF_TIME as validTo since it's a delete with no following record
-        TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), deleteRecordOutput.validFrom);
-        assertEquals(new Timestamp(253402300799000L), deleteRecordOutput.validTo); // END_OF_TIME
+        TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(deleteRecord.tsMs), deleteRecordOutput.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), deleteRecordOutput.validTo); // END_OF_TIME
     }
 
     @Test
@@ -242,9 +245,9 @@ public class SCD2ProcessFunctionTest {
         insertRecord2.op = "c";
 
         // Process records
-        testHarness.processElement(insertRecord, 1000L);
-        testHarness.processElement(deleteRecord, 2000L);
-        testHarness.processElement(insertRecord2, 3000L);
+        testHarness.processElement(insertRecord, insertRecord.tsMs);
+        testHarness.processElement(deleteRecord, deleteRecord.tsMs);
+        testHarness.processElement(insertRecord2, insertRecord2.tsMs);
 
         // Advance time to trigger timer
         testHarness.setProcessingTime(14000L);
@@ -256,9 +259,9 @@ public class SCD2ProcessFunctionTest {
         // Skip to delete record - it should have validTo = next record's tsMs + 1
         output.poll(); // first insert
         output.poll(); // closed first insert
-        TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(2000L), deleteRecordOutput.validFrom);
-        assertEquals(new Timestamp(3001L), deleteRecordOutput.validTo); // Next record's tsMs + 1
+        TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(deleteRecord.tsMs), deleteRecordOutput.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), deleteRecordOutput.validTo); // Next record's tsMs + 1
     }
 
     @Test
@@ -295,8 +298,8 @@ public class SCD2ProcessFunctionTest {
         ConcurrentLinkedQueue<Object> output = testHarness.getOutput();
         assertEquals(1, output.size());
 
-        TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((org.apache.flink.streaming.runtime.streamrecord.StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), outputRecord.validFrom);
-        assertEquals(new Timestamp(1001L), outputRecord.validTo);
+        TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals(new Timestamp(record.tsMs), outputRecord.validFrom);
+        assertEquals(new Timestamp(END_OF_TIME), outputRecord.validTo);
     }
 }

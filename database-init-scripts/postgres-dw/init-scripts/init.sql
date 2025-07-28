@@ -173,11 +173,11 @@ CREATE TABLE
 -- Dimension Tables:
 CREATE TABLE
     IF NOT EXISTS modeling_db.d_orders (
+        orderSk VARCHAR PRIMARY KEY,
         orderId INTEGER,
         status VARCHAR,
         shippingMethod VARCHAR,
         orderDate DATE,
-        orderSk VARCHAR,
         validFrom TIMESTAMP,
         validTo TIMESTAMP
     );
@@ -195,6 +195,22 @@ CREATE TABLE
         state TEXT,
         postalCode TEXT,
         country TEXT,
+        validFrom TIMESTAMP NOT NULL,
+        validTo TIMESTAMP NOT NULL
+    );
+
+CREATE TABLE IF NOT EXISTS
+    modeling_db.d_books (
+        bookSk VARCHAR PRIMARY KEY,
+        bookId INTEGER, 
+        authorId INTEGER,
+        title VARCHAR,
+        isbn VARCHAR,
+        publishedDate DATE,
+        genre VARCHAR,
+        authorFirstName VARCHAR,
+        authorLastName VARCHAR,
+        authorCountry VARCHAR,
         validFrom TIMESTAMP NOT NULL,
         validTo TIMESTAMP NOT NULL
     );

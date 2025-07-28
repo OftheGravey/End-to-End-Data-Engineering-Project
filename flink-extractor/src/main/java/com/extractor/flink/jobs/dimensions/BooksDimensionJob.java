@@ -6,16 +6,22 @@ import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
 import org.apache.flink.connector.jdbc.core.datastream.sink.JdbcSink;
+import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
+import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -29,13 +35,16 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 
 import com.extractor.flink.functions.DebeziumSourceRecord;
 import com.extractor.flink.functions.KafkaProperties;
+import com.extractor.flink.functions.PojoSerializer;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
 import com.extractor.flink.jobs.landing.AuthorsLandingJob;
 import com.extractor.flink.jobs.landing.BooksLandingJob;
-import com.extractor.flink.utils.DWConnectionCommonOptions;
+import com.extractor.flink.utils.TopicNameBuilder;
 
 public class BooksDimensionJob {
+    static String groupId = System.getenv("GROUP_ID");
+    public static String sinkTopic = TopicNameBuilder.build("dimensions.books");
 
     public static class Book extends DebeziumSourceRecord {
         public Integer bookId;
@@ -148,6 +157,26 @@ public class BooksDimensionJob {
             this.validFrom = new Timestamp(record.tsMs);
             this.validTo = new Timestamp(validTo);
         }
+
+        public BookDimension() {};
+
+        @Override
+        public BookDimension clone(Timestamp validTo) {
+            BookDimension newRecord = new BookDimension();
+            newRecord.bookId = this.bookId;
+            newRecord.authorId = this.authorId;
+            newRecord.title = this.title;
+            newRecord.isbn = this.isbn;
+            newRecord.publishedDate = this.publishedDate;
+            newRecord.genre = this.genre;
+            newRecord.authorFirstName = this.authorFirstName;
+            newRecord.authorLastName = this.authorLastName;
+            newRecord.authorCountry = this.authorCountry;
+            newRecord.bookSk = this.bookSk;
+            newRecord.validFrom = this.validFrom;
+            newRecord.validTo = validTo;
+            return newRecord;
+        }
     }
 
     public static class BooksSCD2ProcessFunction extends SCD2ProcessFunction<BookAuthor, BookDimension> {
@@ -190,7 +219,6 @@ public class BooksDimensionJob {
             book.description = node.get("description").asText();
             book.genre = node.get("genre").asText();
             book.stock = node.get("stock").asInt();
-
             book.op = node.get("op").asText();
             book.emittedTsMs = node.get("emitted_ts_ms").asLong();
             book.tsMs = node.get("ts_ms").asLong();
@@ -229,13 +257,14 @@ public class BooksDimensionJob {
 
     public static class BookAuthorJoinFunction extends KeyedCoProcessFunction<Integer, Book, Author, BookAuthor> {
         // State to store the latest book and author records for each authorId
-        private transient ValueState<Book> latestBookState;
+        private transient MapState<Integer, Book> latestBookState;
         private transient ValueState<Author> latestAuthorState;
 
         @Override
         public void open(OpenContext ctx) throws Exception {
-            latestBookState = getRuntimeContext().getState(
-                    new ValueStateDescriptor<>("latestBook", TypeInformation.of(Book.class)));
+            latestBookState = getRuntimeContext().getMapState(
+                    new MapStateDescriptor<>("latestBookState", TypeInformation.of(Integer.class),
+                            TypeInformation.of(Book.class)));
             latestAuthorState = getRuntimeContext().getState(
                     new ValueStateDescriptor<>("latestAuthor", TypeInformation.of(Author.class)));
         }
@@ -244,7 +273,7 @@ public class BooksDimensionJob {
         public void processElement1(Book book, Context context, Collector<BookAuthor> out)
                 throws Exception {
             // A book record arrived. Store it and try to join with the latest author.
-            latestBookState.update(book);
+            latestBookState.put(book.bookId, book);
 
             Author currentAuthor = latestAuthorState.value();
             if (currentAuthor != null) {
@@ -260,24 +289,12 @@ public class BooksDimensionJob {
             // An author record arrived. Store it.
             latestAuthorState.update(author);
 
-            // When an author record arrives, it might trigger joins for any
-            // previously seen books that were waiting for this author.
-            // However, a simple state update doesn't automatically re-emit
-            // previous book records. For full correctness with backfills
-            // you'd need to iterate over state of books, or rely on books
-            // being re-sent.
-            // For a true stream-table join, books would drive the output.
-            // If an author update invalidates previously joined books, you'd
-            // need to implement complex state iteration and updates (SCD2).
-
-            // Here, we just try to join with the latest book if it exists.
-            Book currentBook = latestBookState.value();
-            if (currentBook != null && currentBook.authorId.equals(author.authorId)) {
-                // This is primarily for the case where author arrives *after* book,
-                // or if an author update should trigger a re-emission of the latest book.
-                // Be careful if multiple books share an authorId and you only store
-                // latestBookState.
-                out.collect(createJoinedDimension(currentBook, author));
+            Iterable<Map.Entry<Integer, Book>> books = latestBookState.entries();
+            if (books != null) {
+                for (Map.Entry<Integer, Book> entry : books) {
+                    Book currentBook = entry.getValue();
+                    out.collect(createJoinedDimension(currentBook, author));
+                }
             }
         }
 
@@ -293,6 +310,8 @@ public class BooksDimensionJob {
             dim.lastName = author.lastName;
             dim.country = author.country;
             // Debezium fields from book best for scd2 management
+            dim.op = book.op;
+            dim.tsMs = book.tsMs;
             dim.emittedTsMs = book.emittedTsMs;
             dim.connectorVersion = book.connectorVersion;
             dim.transactionId = book.transactionId;
@@ -311,7 +330,7 @@ public class BooksDimensionJob {
         KafkaSource<String> bookSource = KafkaSource.<String>builder()
                 .setBootstrapServers(KafkaProperties.bootStrapServers)
                 .setTopics(bookSourceTopic)
-                .setGroupId("test2")
+                .setGroupId(groupId)
                 .setStartingOffsets(OffsetsInitializer.earliest())
                 .setValueOnlyDeserializer(new SimpleStringSchema())
                 .build();
@@ -323,13 +342,13 @@ public class BooksDimensionJob {
         DataStream<Book> bookStream = bookRawStream
                 .map(new BookJsonParser())
                 .name("Parse JSON to Book")
-                .keyBy(book -> book.bookId);
+                .keyBy(book -> book.authorId);
 
         // Author Stream
         KafkaSource<String> authorSource = KafkaSource.<String>builder()
                 .setBootstrapServers(KafkaProperties.bootStrapServers)
                 .setTopics(authorSourceTopic)
-                .setGroupId("test2")
+                .setGroupId(groupId)
                 .setStartingOffsets(OffsetsInitializer.earliest())
                 .setValueOnlyDeserializer(new SimpleStringSchema())
                 .build();
@@ -347,41 +366,57 @@ public class BooksDimensionJob {
         DataStream<BookAuthor> bookAuthorStream = bookStream.connect(authorStream)
                 .process(new BookAuthorJoinFunction());
 
+        // bookAuthorStream.print();
+
         DataStream<BookDimension> scd2Stream = bookAuthorStream
                 .keyBy(record -> record.bookId)
                 .process(new BooksSCD2ProcessFunction())
                 .name("SCD2 Transformation");
 
-        JdbcStatementBuilder<BookDimension> sinkStatement = (statement, book) -> {
-            statement.setString(1, book.bookSk);
-            statement.setInt(2, book.bookId);
-            statement.setInt(3, book.authorId);
-            statement.setString(4, book.title);
-            statement.setString(5, book.isbn);
-            statement.setDate(6, book.publishedDate);
-            statement.setString(7, book.genre);
-            statement.setString(8, book.authorFirstName);
-            statement.setString(9, book.authorLastName);
-            statement.setString(10, book.authorCountry);
-            statement.setTimestamp(11, book.validFrom);
-            statement.setTimestamp(12, book.validTo);
-        };
 
-        JdbcSink<BookDimension> sink = JdbcSink.<BookDimension>builder()
-                .withExecutionOptions(JdbcExecutionOptions.builder()
-                        .withBatchSize(1000)
-                        .withBatchIntervalMs(200)
-                        .withMaxRetries(5)
-                        .build())
-                .withQueryStatement(
-                        """
-                                INSERT INTO modeling_db.d_books (
-                                    bookSk, bookId, authorId, title, isbn, publishedDate, genre
-                                    authorFirstName, authorLastName, authorCountry
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                                            """,
-                        sinkStatement)
-                .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
+        KafkaSink<BookDimension> sink = KafkaSink.<BookDimension>builder()
+            .setBootstrapServers(KafkaProperties.bootStrapServers)
+            .setRecordSerializer(
+                KafkaRecordSerializationSchema.builder()
+                .setTopic(sinkTopic)
+                .setValueSerializationSchema(new PojoSerializer<BookDimension>())
+                .build()
+            )
+            .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+            .build();
+
+        // JdbcStatementBuilder<BookDimension> sinkStatement = (statement, book) -> {
+        //     statement.setString(1, book.bookSk);
+        //     statement.setInt(2, book.bookId);
+        //     statement.setInt(3, book.authorId);
+        //     statement.setString(4, book.title);
+        //     statement.setString(5, book.isbn);
+        //     statement.setDate(6, book.publishedDate);
+        //     statement.setString(7, book.genre);
+        //     statement.setString(8, book.authorFirstName);
+        //     statement.setString(9, book.authorLastName);
+        //     statement.setString(10, book.authorCountry);
+        //     statement.setTimestamp(11, book.validFrom);
+        //     statement.setTimestamp(12, book.validTo);
+        // };
+
+        // JdbcSink<BookDimension> sink = JdbcSink.<BookDimension>builder()
+        //         .withExecutionOptions(JdbcExecutionOptions.builder()
+        //                 .withBatchSize(1000)
+        //                 .withBatchIntervalMs(200)
+        //                 .withMaxRetries(5)
+        //                 .build())
+        //         .withQueryStatement(
+        //                 """
+        //                 INSERT INTO modeling_db.d_books (
+        //                     bookSk, bookId, authorId, title, isbn, publishedDate, genre,
+        //                     authorFirstName, authorLastName, authorCountry, validFrom, validTo
+        //                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        //                     ON CONFLICT (bookSk) DO UPDATE SET
+        //                         validTo = EXCLUDED.validTo 
+        //                 """,
+        //                 sinkStatement)
+        //         .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
 
         scd2Stream.sinkTo(sink);
 

@@ -19,7 +19,7 @@ def build_flink_project(project_dir):
 
     print("Building Flink project with Maven...")
     try:
-        maven_command = ["mvn", "clean", "package", "-DskipTests"]
+        maven_command = ["mvn", "clean", "package"]
         result = subprocess.run(maven_command, capture_output=True, text=True, check=False, shell=True)
 
         print(result.stdout)

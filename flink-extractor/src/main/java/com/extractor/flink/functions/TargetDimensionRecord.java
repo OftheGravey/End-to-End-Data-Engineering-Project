@@ -14,7 +14,17 @@ public class TargetDimensionRecord implements Serializable {
         this.validTo = new Timestamp(validTo);
     };
 
+    public TargetDimensionRecord() {}
+
+    public TargetDimensionRecord clone(Timestamp validTo) {
+        TargetDimensionRecord newRecord = new TargetDimensionRecord();
+        newRecord.validFrom = this.validFrom;
+        newRecord.validTo = validTo;
+        return newRecord;
+    }
+
     public String toString(){
         return String.format("TargetRecord(validFrom=%s, validTo=%s)", validFrom, validTo);
     }
+
 }

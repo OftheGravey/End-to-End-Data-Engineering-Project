@@ -1,15 +1,18 @@
 package com.extractor.flink.jobs.dimensions;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.UUID;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
-import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
-import org.apache.flink.connector.jdbc.core.datastream.sink.JdbcSink;
+import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
+import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -20,12 +23,15 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 
 import com.extractor.flink.functions.DebeziumSourceRecord;
 import com.extractor.flink.functions.KafkaProperties;
+import com.extractor.flink.functions.PojoSerializer;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
 import com.extractor.flink.jobs.landing.OrdersLandingJob;
-import com.extractor.flink.utils.DWConnectionCommonOptions;
+import com.extractor.flink.utils.TopicNameBuilder;
 
 public class OrdersDimensionJob {
+    public static String sinkTopic = TopicNameBuilder.build("dimensions.orders");
+    static String groupId = System.getenv("GROUP_ID");
 
     public static class Order extends DebeziumSourceRecord {
         public Integer orderId;
@@ -53,20 +59,47 @@ public class OrdersDimensionJob {
         public Integer orderId;
         public String status;
         public String shippingMethod;
-        public Date orderDate; // timestamp as long
+        public Date orderDate;
         public String orderSk;
+        // (customerId) A Kimball rule break - needed because order_items does not have
+        //   customerId field. So order item facts would not have direct access to
+        //   the customer. Can be filtered out in a presentation layer view
+        public Integer customerId; 
         public Timestamp validFrom;
         public Timestamp validTo;
 
         public OrderDimension(Order record, Long validTo) {
             super(record, validTo);
             this.status = record.status;
+            this.customerId = record.customerId;
             this.orderId = record.orderId;
             this.shippingMethod = record.shippingMethod;
             this.orderDate = new Date(record.orderDate);
             this.orderSk = UUID.randomUUID().toString();
             this.validFrom = new Timestamp(record.tsMs);
             this.validTo = new Timestamp(validTo);
+        }
+
+        public OrderDimension() {};
+
+        @Override
+        public OrderDimension clone(Timestamp validTo) {
+            OrderDimension newRecord = new OrderDimension();
+            newRecord.status = this.status;
+            newRecord.orderId = this.orderId;
+            newRecord.customerId = this.customerId;
+            newRecord.shippingMethod = this.shippingMethod;
+            newRecord.orderDate = this.orderDate;
+            newRecord.orderSk = this.orderSk;
+            newRecord.validFrom = this.validFrom;
+            newRecord.validTo = validTo;
+            return newRecord;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Order(orderId=%d, validFrom=%s, validTo=%s)", orderId,
+                    new Timestamp(validFrom.getTime()), new Timestamp(validTo.getTime()));
         }
     }
 
@@ -109,7 +142,7 @@ public class OrdersDimensionJob {
         KafkaSource<String> source = KafkaSource.<String>builder()
                 .setBootstrapServers(KafkaProperties.bootStrapServers)
                 .setTopics(sourceTopic)
-                .setGroupId("test2")
+                .setGroupId(groupId)
                 .setStartingOffsets(OffsetsInitializer.earliest())
                 .setValueOnlyDeserializer(new SimpleStringSchema())
                 .build();
@@ -127,26 +160,52 @@ public class OrdersDimensionJob {
                 .process(new OrdersSCD2ProcessFunction())
                 .name("SCD2 Transformation");
 
-        JdbcStatementBuilder<OrderDimension> sinkStatement = (statement, order) -> {
-            statement.setInt(1, order.orderId);
-            statement.setString(2, order.status);
-            statement.setString(3, order.shippingMethod);
-            statement.setDate(4, order.orderDate);
-            statement.setString(5, order.orderSk);
-            statement.setTimestamp(6, order.validFrom);
-            statement.setTimestamp(7, order.validTo);
-        };
 
+        KafkaSink<OrderDimension> sink = KafkaSink.<OrderDimension>builder()
+            .setBootstrapServers(KafkaProperties.bootStrapServers)
+            .setRecordSerializer(
+                KafkaRecordSerializationSchema.builder()
+                .setTopic(sinkTopic)
+                .setValueSerializationSchema(new PojoSerializer<OrderDimension>())
+                .build()
+            )
+            .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+            .build();
+ 
+        // JdbcStatementBuilder<OrderDimension> sinkStatement = (statement, order) -> {
+        //     statement.setInt(1, order.orderId);
+        //     statement.setString(2, order.status);
+        //     statement.setString(3, order.shippingMethod);
+        //     statement.setDate(4, order.orderDate);
+        //     statement.setString(5, order.orderSk);
+        //     statement.setTimestamp(6, order.validFrom);
+        //     statement.setTimestamp(7, order.validTo);
+        // };
 
-        JdbcSink<OrderDimension> sink = JdbcSink.<OrderDimension>builder().withExecutionOptions(JdbcExecutionOptions.builder()
-                .withBatchSize(1000)
-                .withBatchIntervalMs(200)
-                .withMaxRetries(5)
-                .build())
-                .withQueryStatement(
-                        "insert into modeling_db.d_orders (orderId, status, shippingMethod, orderDate, orderSk, validFrom, validTo) values (?, ?, ?, ?, ?, ?, ?)",
-                        sinkStatement)
-                .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
+        // JdbcSink<OrderDimension> sink = JdbcSink.<OrderDimension>builder()
+        //         .withExecutionOptions(JdbcExecutionOptions.builder()
+        //                 .withBatchSize(1000)
+        //                 .withBatchIntervalMs(200)
+        //                 .withMaxRetries(5)
+        //                 .build())
+        //         .withQueryStatement(
+        //                 """
+        //                 insert into modeling_db.d_orders
+        //                     (
+        //                         orderId, 
+        //                         status, 
+        //                         shippingMethod, 
+        //                         orderDate, 
+        //                         orderSk, 
+        //                         validFrom, 
+        //                         validTo
+        //                     ) 
+        //                      values (?, ?, ?, ?, ?, ?, ?) 
+        //                      ON CONFLICT (ordersk) DO UPDATE SET 
+        //                         validTo = EXCLUDED.validTo
+        //                 """,
+        //                 sinkStatement)
+        //         .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
 
         scd2Stream.sinkTo(sink);
 

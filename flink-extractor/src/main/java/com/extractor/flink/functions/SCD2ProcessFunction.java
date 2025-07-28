@@ -20,13 +20,13 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
     private static final long END_OF_TIME = 253402300799000L; // 9999-12-31 in milliseconds
     private static final long BUFFER_TIMEOUT_MS = 10 * 1000;
 
-    private ValueState<OUT> currentRecordState;
-    private MapState<Long, IN> pendingRecordsState;
-    private ValueState<Long> timerState;
+    public ValueState<OUT> currentRecordState;
+    public MapState<Long, IN> pendingRecordsState;
+    public ValueState<Long> timerState;
 
     @FunctionalInterface
     public interface SerializableBiFunction<T, U, R> extends BiFunction<T, U, R>, Serializable {}
-    private final SerializableBiFunction<IN, Long, OUT> outputFactory;
+    public final SerializableBiFunction<IN, Long, OUT> outputFactory;
     private final  TypeInformation<IN> inTypeInfo;
     private final  TypeInformation<OUT> outTypeInfo;
 
@@ -73,7 +73,6 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<OUT> out) throws Exception {
         List<Map.Entry<Long, IN>> sortedRecords = new ArrayList<>();
-
         for (Map.Entry<Long, IN> entry : pendingRecordsState.entries()) {
             sortedRecords.add(entry);
         }
@@ -81,17 +80,17 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
         sortedRecords.sort(Map.Entry.comparingByKey());
 
         OUT currentRecord = currentRecordState.value();
-
         for (int i = 0; i < sortedRecords.size(); i++) {
             IN record = sortedRecords.get(i).getValue();
             Long validTo = calculateValidTo(record, sortedRecords, i);
 
             if (currentRecord != null) {
-                currentRecord.validTo = new Timestamp(record.tsMs);
-                out.collect(currentRecord);
+                OUT newCurrentRecord = (OUT) currentRecord.clone(new Timestamp(record.tsMs - 1));
+                newCurrentRecord.validTo = new Timestamp(record.tsMs - 1);
+                out.collect(newCurrentRecord);
             }
 
-            OUT scd2Record = outputFactory.apply(record, validTo);
+            OUT scd2Record = outputFactory.apply(record, END_OF_TIME);
 
 
             if ("d" != (record.op)) {
@@ -101,7 +100,6 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
                 currentRecordState.clear();
                 currentRecord = null;
             }
-
             out.collect(scd2Record);
         }
         pendingRecordsState.clear();
@@ -110,16 +108,11 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
 
     private Long calculateValidTo(IN currentRecord, List<Map.Entry<Long, IN>> sortedRecords,
             int currentIndex) {
-        if (!"d".equals(currentRecord.op)) {
-            // For non-delete operations, valid_to is ts_ms + 1
-            return currentRecord.tsMs + 1;
+        if ("d".equals(currentRecord.op) || currentIndex == sortedRecords.size() - 1) {
+            return END_OF_TIME;
         } else {
-            if (currentIndex < sortedRecords.size() - 1) {
-                IN nextRecord = sortedRecords.get(currentIndex + 1).getValue();
-                return nextRecord.tsMs + 1;
-            } else {
-                return END_OF_TIME;
-            }
+            IN nextRecord = sortedRecords.get(currentIndex + 1).getValue();
+            return nextRecord.tsMs - 1;
         }
     }
 }
