@@ -179,11 +179,15 @@ public class OrderItemsFactJob {
             JsonNode node = objectMapper.readTree(jsonString);
             OrderItem orderItem = new OrderItem();
 
-            orderItem.orderItemId = node.get("orderItemId").asInt();
-            orderItem.orderId = node.get("orderId").asInt();
-            orderItem.bookId = node.get("bookId").asInt();
+            if (node.get("order_item_id") == null) {
+                return orderItem;
+            }
+
+            orderItem.orderItemId = node.get("order_item_id").asInt();
+            orderItem.orderId = node.get("order_id").asInt();
+            orderItem.bookId = node.get("book_id").asInt();
             orderItem.quantity = node.get("quantity").asInt();
-            orderItem.priceAtPurchase = base64ToScaledDouble(node.get("priceAtPurchase").asText(), 2);
+            orderItem.priceAtPurchase = base64ToScaledDouble(node.get("price_at_purchase").asText(), 2);
             orderItem.discount = base64ToScaledDouble(node.get("discount").asText(), 2);
 
             orderItem.op = node.get("op").asText();
@@ -293,13 +297,16 @@ public class OrderItemsFactJob {
 
         DataStream<OrderItem> orderItemStream = orderItemRawStream.map(new OrderItemJsonParser())
                 .name("Parse JSON to Order Item")
+                .filter(order -> order.orderId != null)
                 .keyBy(orderItem -> orderItem.orderId);
 
         // Enrich order item facts
         DataStream<OrderItemWithBook> orderItemEnriched = orderItemStream
                 .connect(orderDimensionStream)
                 .process(new OrderItemOrderJoinFunction())
+                .keyBy(customer -> customer.customerId)
                 .connect(customerDimensionStream).process(new OrderItemCustomerJoinFunction())
+                .keyBy(book -> book.bookId)
                 .connect(bookDimensionStream)
                 .process(new OrderItemBookJoinFunction());
 
@@ -312,10 +319,11 @@ public class OrderItemsFactJob {
                                 .setTopic(sinkTopic)
                                 .setValueSerializationSchema(new PojoSerializer<OrderItemFact>())
                                 .build())
-                .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+                .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
                 .build();
 
         orderFacts.sinkTo(sink);
 
+        env.execute("f_order_items job");
     }
 }

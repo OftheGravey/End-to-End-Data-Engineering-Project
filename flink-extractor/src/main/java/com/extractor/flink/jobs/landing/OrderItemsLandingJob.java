@@ -36,8 +36,8 @@ public class OrderItemsLandingJob {
                     order_id INTEGER NOT NULL,
                     book_id INTEGER NOT NULL,
                     quantity INTEGER NOT NULL,
-                    price_at_purchase DOUBLE PRECISION NOT NULL,
-                    discount DOUBLE PRECISION,
+                    price_at_purchase STRING,
+                    discount STRING,
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
@@ -52,8 +52,8 @@ public class OrderItemsLandingJob {
                     CAST(JSON_VALUE(payload, '$.after.order_id') AS INTEGER) AS order_id,
                     CAST(JSON_VALUE(payload, '$.after.book_id') AS INTEGER) AS book_id,
                     CAST(JSON_VALUE(payload, '$.after.quantity') AS INTEGER) AS quantity,
-                    base64_to_double(CAST(JSON_VALUE(payload, '$.after.price_at_purchase') AS STRING), 2) AS price_at_purchase,
-                    base64_to_double(CAST(JSON_VALUE(payload, '$.after.discount') AS STRING), 2) AS discount,
+                    CAST(JSON_VALUE(payload, '$.after.price_at_purchase') AS STRING) AS price_at_purchase,
+                    CAST(JSON_VALUE(payload, '$.after.discount') AS STRING) AS discount,
                     %s
                 FROM order_items
                 """, insertTableDebeziumColumns);

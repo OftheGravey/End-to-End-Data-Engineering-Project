@@ -64,6 +64,7 @@ def trigger_flink_job(
 ) -> str:
     most_recent_jar = pull_most_recent(config.jar_id)
     url = f"{FLINK_BASE_URL}/jars/{most_recent_jar}/run"
+    print("JAR URL:", url)
     response = requests.post(url, params={"entry-class": config.class_name})
     response.raise_for_status()
     job_id = response.json()["jobid"]
@@ -90,6 +91,10 @@ def trigger_flink_job(
                 jar_id="flink-extractor-1.0-SNAPSHOT.jar",
                 class_name="com.extractor.flink.jobs.landing.BooksLandingJob",
             ),
+            "Order_Items_Landing": FlinkJobConfig(
+                jar_id="flink-extractor-1.0-SNAPSHOT.jar",
+                class_name="com.extractor.flink.jobs.landing.OrderItemsLandingJob",
+            ),
             "Orders_Dimension": FlinkJobConfig(
                 jar_id="flink-extractor-1.0-SNAPSHOT.jar",
                 class_name="com.extractor.flink.jobs.dimensions.OrdersDimensionJob",
@@ -101,6 +106,10 @@ def trigger_flink_job(
             "Books_Dimension": FlinkJobConfig(
                 jar_id="flink-extractor-1.0-SNAPSHOT.jar",
                 class_name="com.extractor.flink.jobs.dimensions.BooksDimensionJob",
+            ),
+            "Order_Item_Facts": FlinkJobConfig(
+                jar_id="flink-extractor-1.0-SNAPSHOT.jar",
+                class_name="com.extractor.flink.jobs.facts.OrderItemsFactJob",
             ),
         }
     )
@@ -131,3 +140,16 @@ def streaming_pipeline():
         upstream_flink_job_id=[authors_landing_job_id, books_landing_job_id]
     )
     monitor_flink_job.alias("Books_Dimension_Monitoring")(books_dimension_job_id)
+
+    # order item facts
+    order_items_landing_job_id = trigger_flink_job.alias("Order_Items_Landing")()
+    monitor_flink_job.alias("Order_Items_Landing_Monitor")(order_items_landing_job_id)
+    order_items_fact_job_id = trigger_flink_job.alias("Order_Item_Facts")(
+        upstream_flink_job_id=[
+            order_items_landing_job_id,
+            books_dimension_job_id,
+            customers_dimension_job_id,
+            orders_dimension_job_id,
+        ]
+    )
+    monitor_flink_job.alias("Order_Items_Fact_Monitor")(order_items_fact_job_id)

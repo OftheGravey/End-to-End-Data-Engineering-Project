@@ -189,7 +189,7 @@ public class CustomersDimensionJob {
                 .setValueSerializationSchema(new PojoSerializer<CustomerDimension>())
                 .build()
             )
-            .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+            .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
             .build();
 
         // JdbcStatementBuilder<CustomerDimension> sinkStatement = (statement, customer) -> {

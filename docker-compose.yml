@@ -95,7 +95,7 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 9
+        taskmanager.numberOfTaskSlots: 15
       - DW_USERNAME=${DW_USERNAME}
       - DW_PASSWORD=${DW_PASSWORD}
       - DW_HOSTNAME=${DW_HOSTNAME}

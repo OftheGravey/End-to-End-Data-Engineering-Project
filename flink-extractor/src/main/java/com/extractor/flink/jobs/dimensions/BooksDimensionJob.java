@@ -382,7 +382,7 @@ public class BooksDimensionJob {
                 .setValueSerializationSchema(new PojoSerializer<BookDimension>())
                 .build()
             )
-            .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+            .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
             .build();
 
         // JdbcStatementBuilder<BookDimension> sinkStatement = (statement, book) -> {

@@ -169,7 +169,7 @@ public class OrdersDimensionJob {
                 .setValueSerializationSchema(new PojoSerializer<OrderDimension>())
                 .build()
             )
-            .setDeliveryGuarantee(DeliveryGuarantee.EXACTLY_ONCE)
+            .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
             .build();
  
         // JdbcStatementBuilder<OrderDimension> sinkStatement = (statement, order) -> {
