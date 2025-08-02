@@ -1,3 +1,4 @@
 .venv
 data/staging.db
 test.ipynb
+.metals
