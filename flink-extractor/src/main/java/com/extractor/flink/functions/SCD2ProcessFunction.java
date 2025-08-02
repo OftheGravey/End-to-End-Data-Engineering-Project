@@ -1,6 +1,5 @@
 package com.extractor.flink.functions;
 
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +13,7 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 
-public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends TargetDimensionRecord>
+public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends TargetDimensionRecord>
         extends KeyedProcessFunction<Integer, IN, OUT>{
 
     private static final long END_OF_TIME = 253402300799000L; // 9999-12-31 in milliseconds
@@ -30,7 +29,7 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
     private final  TypeInformation<IN> inTypeInfo;
     private final  TypeInformation<OUT> outTypeInfo;
 
-    protected SCD2ProcessFunction(TypeInformation<IN> inTypeInfo,
+    public SCD2ProcessFunction(TypeInformation<IN> inTypeInfo,
                                   TypeInformation<OUT> outTypeInfo,
                                   SerializableBiFunction<IN, Long, OUT> outputFactory) {
         this.inTypeInfo = inTypeInfo;
@@ -82,11 +81,11 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
         OUT currentRecord = currentRecordState.value();
         for (int i = 0; i < sortedRecords.size(); i++) {
             IN record = sortedRecords.get(i).getValue();
-            Long validTo = calculateValidTo(record, sortedRecords, i);
 
             if (currentRecord != null) {
-                OUT newCurrentRecord = (OUT) currentRecord.clone(new Timestamp(record.tsMs - 1));
-                newCurrentRecord.validTo = new Timestamp(record.tsMs - 1);
+                OUT newCurrentRecord = (OUT) currentRecord.clone(record.tsMs - 1);
+                newCurrentRecord.validFrom = currentRecord.validFrom;
+                newCurrentRecord.validTo = record.tsMs - 1;
                 out.collect(newCurrentRecord);
             }
 
@@ -104,15 +103,5 @@ public abstract class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT e
         }
         pendingRecordsState.clear();
         timerState.clear();
-    }
-
-    private Long calculateValidTo(IN currentRecord, List<Map.Entry<Long, IN>> sortedRecords,
-            int currentIndex) {
-        if ("d".equals(currentRecord.op) || currentIndex == sortedRecords.size() - 1) {
-            return END_OF_TIME;
-        } else {
-            IN nextRecord = sortedRecords.get(currentIndex + 1).getValue();
-            return nextRecord.tsMs - 1;
-        }
     }
 }

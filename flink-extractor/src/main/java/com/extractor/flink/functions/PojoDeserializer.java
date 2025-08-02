@@ -21,27 +21,29 @@ public class PojoDeserializer<T> implements DeserializationSchema<T> {
 
     @Override
     public void open(InitializationContext context) throws Exception {
-        // Initialize ObjectMapper in the open method
         this.objectMapper = new ObjectMapper();
-        this.objectReader = objectMapper.readerFor(type); // Use the provided type
+        this.objectReader = objectMapper.readerFor(type);
     }
 
     @Override
     public T deserialize(byte[] message) throws IOException {
-        // Convert bytes to JSON string and then to POJO object
-        return objectReader.readValue(new String(message, StandardCharsets.UTF_8));
+        //System.err.println("Failed to deserialize message: " + new String(message, StandardCharsets.UTF_8));
+        try {
+            return objectReader.readValue(new String(message, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            System.err.println("Failed to deserialize message: " + new String(message, StandardCharsets.UTF_8));
+            System.err.println("Error: " + e.getMessage());
+            return null;
+        }
     }
 
     @Override
     public boolean isEndOfStream(T nextElement) {
-        // For continuous streams, this should always return false.
-        // It's used for bounded streams to signal the end.
         return false;
     }
 
     @Override
     public TypeInformation<T> getProducedType() {
-        // Return the TypeInformation for the POJO
         return TypeInformation.of(type);
     }
 }

@@ -1,22 +1,21 @@
 package com.extractor.flink.functions;
 
 import java.io.Serializable;
-import java.sql.Timestamp;
 
 import lombok.Data;
 
 @Data
 public class TargetDimensionRecord implements Serializable {
-    public Timestamp validTo;
-    public Timestamp validFrom; 
+    public Long validTo;
+    public Long validFrom; 
     public TargetDimensionRecord(DebeziumSourceRecord record, Long validTo) {
-        this.validFrom = new Timestamp(record.tsMs);
-        this.validTo = new Timestamp(validTo);
+        this.validFrom = record.tsMs;
+        this.validTo = validTo;
     };
 
     public TargetDimensionRecord() {}
 
-    public TargetDimensionRecord clone(Timestamp validTo) {
+    public TargetDimensionRecord clone(Long validTo) {
         TargetDimensionRecord newRecord = new TargetDimensionRecord();
         newRecord.validFrom = this.validFrom;
         newRecord.validTo = validTo;

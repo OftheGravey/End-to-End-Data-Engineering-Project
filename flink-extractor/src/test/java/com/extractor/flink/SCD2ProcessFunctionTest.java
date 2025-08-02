@@ -70,8 +70,8 @@ public class SCD2ProcessFunctionTest {
         assertEquals(1, output.size());
 
         TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(1000L), outputRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), outputRecord.validTo);
+        assertEquals((1000L), outputRecord.validFrom);
+        assertEquals((END_OF_TIME), outputRecord.validTo);
     }
 
     @Test
@@ -108,28 +108,28 @@ public class SCD2ProcessFunctionTest {
 
         // First record
         TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record1.tsMs), firstRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), firstRecord.validTo);
+        assertEquals((record1.tsMs), firstRecord.validFrom);
+        assertEquals((END_OF_TIME), firstRecord.validTo);
 
         // First record gets closed when second arrives
         TargetDimensionRecord closedRecord1 = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record1.tsMs), closedRecord1.validFrom);
-        assertEquals(new Timestamp(record2.tsMs - 1), closedRecord1.validTo);
+        assertEquals((record1.tsMs), closedRecord1.validFrom);
+        assertEquals((record2.tsMs - 1), closedRecord1.validTo);
 
         // Second record
         TargetDimensionRecord secondRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record2.tsMs), secondRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), secondRecord.validTo);
+        assertEquals((record2.tsMs), secondRecord.validFrom);
+        assertEquals((END_OF_TIME), secondRecord.validTo);
 
         // Second record gets closed when third arrives
         TargetDimensionRecord closedRecord2 = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record2.tsMs), closedRecord2.validFrom);
-        assertEquals(new Timestamp(record3.tsMs - 1), closedRecord2.validTo);
+        assertEquals((record2.tsMs), closedRecord2.validFrom);
+        assertEquals((record3.tsMs - 1), closedRecord2.validTo);
 
         // Third record
         TargetDimensionRecord thirdRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record3.tsMs), thirdRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), thirdRecord.validTo);
+        assertEquals((record3.tsMs), thirdRecord.validFrom);
+        assertEquals((END_OF_TIME), thirdRecord.validTo);
     }
 
     @Test
@@ -167,28 +167,28 @@ public class SCD2ProcessFunctionTest {
 
         // First record (1000L) - no previous record to close
         TargetDimensionRecord firstProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record2.tsMs), firstProcessed.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), firstProcessed.validTo);
+        assertEquals((record2.tsMs), firstProcessed.validFrom);
+        assertEquals((END_OF_TIME), firstProcessed.validTo);
 
         // First record gets closed when second arrives (validTo becomes 2000L)
         TargetDimensionRecord firstClosed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record2.tsMs), firstClosed.validFrom);
-        assertEquals(new Timestamp(record3.tsMs - 1), firstClosed.validTo);
+        assertEquals((record2.tsMs), firstClosed.validFrom);
+        assertEquals((record3.tsMs - 1), firstClosed.validTo);
 
         // Second record (2000L)
         TargetDimensionRecord secondProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record3.tsMs), secondProcessed.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), secondProcessed.validTo);
+        assertEquals((record3.tsMs), secondProcessed.validFrom);
+        assertEquals((END_OF_TIME), secondProcessed.validTo);
 
         // Second record gets closed when third arrives (validTo becomes 3000L)
         TargetDimensionRecord secondClosed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record3.tsMs), secondClosed.validFrom);
-        assertEquals(new Timestamp(record1.tsMs - 1), secondClosed.validTo);
+        assertEquals((record3.tsMs), secondClosed.validFrom);
+        assertEquals((record1.tsMs - 1), secondClosed.validTo);
 
         // Third record (3000L)
         TargetDimensionRecord thirdProcessed = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record1.tsMs), thirdProcessed.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), thirdProcessed.validTo);
+        assertEquals((record1.tsMs), thirdProcessed.validFrom);
+        assertEquals((END_OF_TIME), thirdProcessed.validTo);
     }
 
     @Test
@@ -215,18 +215,18 @@ public class SCD2ProcessFunctionTest {
 
         // First record
         TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(insertRecord.tsMs), firstRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), firstRecord.validTo);
+        assertEquals((insertRecord.tsMs), firstRecord.validFrom);
+        assertEquals((END_OF_TIME), firstRecord.validTo);
 
         // Insert record gets closed by delete
         TargetDimensionRecord closedRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(insertRecord.tsMs), closedRecord.validFrom);
-        assertEquals(new Timestamp(deleteRecord.tsMs - 1), closedRecord.validTo);
+        assertEquals((insertRecord.tsMs), closedRecord.validFrom);
+        assertEquals((deleteRecord.tsMs - 1), closedRecord.validTo);
 
         // Delete record - should have END_OF_TIME as validTo since it's a delete with no following record
         TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(deleteRecord.tsMs), deleteRecordOutput.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), deleteRecordOutput.validTo); // END_OF_TIME
+        assertEquals((deleteRecord.tsMs), deleteRecordOutput.validFrom);
+        assertEquals((END_OF_TIME), deleteRecordOutput.validTo); // END_OF_TIME
     }
 
     @Test
@@ -260,8 +260,8 @@ public class SCD2ProcessFunctionTest {
         output.poll(); // first insert
         output.poll(); // closed first insert
         TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(deleteRecord.tsMs), deleteRecordOutput.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), deleteRecordOutput.validTo); // Next record's tsMs + 1
+        assertEquals((deleteRecord.tsMs), deleteRecordOutput.validFrom);
+        assertEquals((END_OF_TIME), deleteRecordOutput.validTo); // Next record's tsMs + 1
     }
 
     @Test
@@ -299,7 +299,7 @@ public class SCD2ProcessFunctionTest {
         assertEquals(1, output.size());
 
         TargetDimensionRecord outputRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
-        assertEquals(new Timestamp(record.tsMs), outputRecord.validFrom);
-        assertEquals(new Timestamp(END_OF_TIME), outputRecord.validTo);
+        assertEquals((record.tsMs), outputRecord.validFrom);
+        assertEquals((END_OF_TIME), outputRecord.validTo);
     }
 }

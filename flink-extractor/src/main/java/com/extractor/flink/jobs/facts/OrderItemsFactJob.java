@@ -1,24 +1,21 @@
 package com.extractor.flink.jobs.facts;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
-import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.Base64;
-import java.util.Map;
 import java.util.UUID;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
-import org.apache.flink.api.common.state.MapState;
-import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
+import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
+import org.apache.flink.connector.jdbc.core.datastream.sink.JdbcSink;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
@@ -27,303 +24,321 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
+import org.apache.flink.streaming.api.functions.co.ProcessJoinFunction;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.extractor.flink.functions.CommonFunctions;
 import com.extractor.flink.functions.DebeziumSourceRecord;
-import com.extractor.flink.functions.FactDimensionJoiner;
 import com.extractor.flink.functions.KafkaProperties;
 import com.extractor.flink.jobs.dimensions.BooksDimensionJob;
 import com.extractor.flink.jobs.dimensions.CustomersDimensionJob;
 import com.extractor.flink.jobs.dimensions.OrdersDimensionJob;
-import com.extractor.flink.jobs.dimensions.BooksDimensionJob.Author;
-import com.extractor.flink.jobs.dimensions.BooksDimensionJob.Book;
-import com.extractor.flink.jobs.dimensions.BooksDimensionJob.BookAuthor;
 import com.extractor.flink.jobs.dimensions.BooksDimensionJob.BookDimension;
 import com.extractor.flink.jobs.dimensions.CustomersDimensionJob.CustomerDimension;
-import com.extractor.flink.jobs.dimensions.OrdersDimensionJob.Order;
 import com.extractor.flink.jobs.dimensions.OrdersDimensionJob.OrderDimension;
-import com.extractor.flink.jobs.facts.OrderItemsFactJob.OrderItem;
+import com.extractor.flink.jobs.landing.OrderItemsLandingJob;
 import com.extractor.flink.jobs.landing.OrdersLandingJob;
+import com.extractor.flink.utils.DWConnectionCommonOptions;
 import com.extractor.flink.utils.TopicNameBuilder;
 import com.extractor.flink.functions.PojoDeserializer;
 import com.extractor.flink.functions.PojoSerializer;
 
 public class OrderItemsFactJob {
-    public static class OrderItemWithOrder extends OrderItem {
-        public String orderSk;
-        public Integer customerId;
+	private static final Logger LOG = LoggerFactory.getLogger(OrderItemsFactJob.class);
 
-        public static OrderItemWithOrder createJoinedRecord(OrderItem orderItem, OrderDimension order) {
-            OrderItemWithOrder record = new OrderItemWithOrder();
-            record.tsMs = orderItem.tsMs;
-            record.orderItemId = orderItem.orderItemId;
-            record.orderId = orderItem.orderId;
-            record.bookId = orderItem.bookId;
-            record.quantity = orderItem.quantity;
-            record.priceAtPurchase = orderItem.priceAtPurchase;
-            record.discount = orderItem.discount;
+	public static class OrderItemWithOrder extends OrderItem {
+		public String orderSk;
+		public Integer customerId;
 
-            // New assignment
-            record.orderSk = order.orderSk;
-            record.customerId = order.customerId;
+		public static OrderItemWithOrder createJoinedRecord(OrderItem orderItem, OrderDimension order) {
+			OrderItemWithOrder record = new OrderItemWithOrder();
+			record.tsMs = orderItem.tsMs;
+			record.orderItemId = orderItem.orderItemId;
+			record.orderId = orderItem.orderId;
+			record.bookId = orderItem.bookId;
+			record.quantity = orderItem.quantity;
+			record.priceAtPurchase = orderItem.priceAtPurchase;
+			record.discount = orderItem.discount;
 
-            return record;
-        }
-    }
+			// New assignment
+			record.orderSk = order.orderSk;
+			record.customerId = order.customerId;
 
-    public static class OrderItemWithCustomer extends OrderItemWithOrder {
-        public String customerSk;
+			return record;
+		}
+	}
 
-        public static OrderItemWithCustomer createJoinedRecord(OrderItemWithOrder orderItem,
-                CustomerDimension customer) {
-            OrderItemWithCustomer record = new OrderItemWithCustomer();
-            record.tsMs = orderItem.tsMs;
-            record.orderItemId = orderItem.orderItemId;
-            record.orderId = orderItem.orderId;
-            record.bookId = orderItem.bookId;
-            record.quantity = orderItem.quantity;
-            record.priceAtPurchase = orderItem.priceAtPurchase;
-            record.discount = orderItem.discount;
-            record.orderSk = orderItem.orderSk;
+	public static class OrderItemWithCustomer extends OrderItemWithOrder {
+		public String customerSk;
 
-            // New
-            record.customerSk = customer.customerSk;
+		public static OrderItemWithCustomer createJoinedRecord(OrderItemWithOrder orderItem,
+				CustomerDimension customer) {
+			OrderItemWithCustomer record = new OrderItemWithCustomer();
+			record.tsMs = orderItem.tsMs;
+			record.orderItemId = orderItem.orderItemId;
+			record.orderId = orderItem.orderId;
+			record.bookId = orderItem.bookId;
+			record.quantity = orderItem.quantity;
+			record.priceAtPurchase = orderItem.priceAtPurchase;
+			record.discount = orderItem.discount;
+			record.orderSk = orderItem.orderSk;
 
-            return record;
-        }
-    }
+			// New
+			record.customerSk = customer.customerSk;
 
-    public static class OrderItemWithBook extends OrderItemWithCustomer {
-        public String bookSk;
+			return record;
+		}
+	}
 
-        public static OrderItemWithBook createJoinedRecord(OrderItemWithCustomer orderItem, BookDimension book) {
-            OrderItemWithBook record = new OrderItemWithBook();
-            record.tsMs = orderItem.tsMs;
-            record.orderItemId = orderItem.orderItemId;
-            record.orderId = orderItem.orderId;
-            record.bookId = orderItem.bookId;
-            record.quantity = orderItem.quantity;
-            record.priceAtPurchase = orderItem.priceAtPurchase;
-            record.discount = orderItem.discount;
-            record.orderSk = orderItem.orderSk;
-            record.customerSk = orderItem.customerSk;
+	public static class OrderItemWithBook extends OrderItemWithCustomer {
+		public String bookSk;
 
-            // New
-            record.bookSk = book.bookSk;
+		public static OrderItemWithBook createJoinedRecord(OrderItemWithCustomer orderItem, BookDimension book) {
+			OrderItemWithBook record = new OrderItemWithBook();
+			record.tsMs = orderItem.tsMs;
+			record.orderItemId = orderItem.orderItemId;
+			record.orderId = orderItem.orderId;
+			record.bookId = orderItem.bookId;
+			record.quantity = orderItem.quantity;
+			record.priceAtPurchase = orderItem.priceAtPurchase;
+			record.discount = orderItem.discount;
+			record.orderSk = orderItem.orderSk;
+			record.customerSk = orderItem.customerSk;
 
-            return record;
-        }
-    }
+			// New
+			record.bookSk = book.bookSk;
 
-    public static class OrderItemFactMapping implements MapFunction<OrderItemWithBook, OrderItemFact> {
-        @Override
-        public OrderItemFact map(OrderItemWithBook orderItem) {
-            OrderItemFact orderItemFact = new OrderItemFact();
-            orderItemFact.orderItemSk = UUID.randomUUID().toString();
-            orderItemFact.orderSk = orderItem.orderSk;
-            orderItemFact.bookSk = orderItem.bookSk;
-            orderItemFact.customerSk = orderItem.customerSk;
-            orderItemFact.orderItemId = orderItem.orderItemId;
-            orderItemFact.quantity = orderItem.quantity;
-            orderItemFact.priceAtPurchase = orderItem.priceAtPurchase;
-            orderItemFact.discount = orderItem.discount;
-            orderItemFact.transactionTime = new Timestamp(orderItem.tsMs);
-            orderItemFact.priceTotal = orderItem.quantity * orderItem.priceAtPurchase * (1 - orderItem.discount);
-            return orderItemFact;
-        }
-    }
+			return record;
+		}
+	}
 
-    public static class OrderItemFact {
-        public String orderItemSk;
-        public String orderSk;
-        public String bookSk;
-        public String customerSk;
-        public Integer orderItemId;
-        public Integer quantity;
-        public Double priceAtPurchase;
-        public Double discount;
-        public Timestamp transactionTime;
-        public Double priceTotal;
-    }
+	public static class OrderItemFactMapping implements MapFunction<OrderItemWithBook, OrderItemFact> {
+		@Override
+		public OrderItemFact map(OrderItemWithBook orderItem) {
+			OrderItemFact orderItemFact = new OrderItemFact();
+			orderItemFact.orderItemSk = UUID.randomUUID().toString();
+			orderItemFact.orderSk = orderItem.orderSk;
+			orderItemFact.bookSk = orderItem.bookSk;
+			orderItemFact.customerSk = orderItem.customerSk;
+			orderItemFact.orderItemId = orderItem.orderItemId;
+			orderItemFact.quantity = orderItem.quantity;
+			orderItemFact.priceAtPurchase = orderItem.priceAtPurchase;
+			orderItemFact.discount = orderItem.discount;
+			orderItemFact.transactionTime = orderItem.tsMs;
+			orderItemFact.priceTotal = orderItem.quantity * orderItem.priceAtPurchase * (1 - orderItem.discount);
+			return orderItemFact;
+		}
+	}
 
-    public static class OrderItem extends DebeziumSourceRecord {
-        public Integer orderItemId;
-        public Integer orderId;
-        public Integer bookId;
-        public Integer quantity;
-        public Double priceAtPurchase;
-        public Double discount;
-        public Long emittedTsMs;
-        public String connectorVersion;
-        public String transactionId;
-        public Long lsn;
-    }
+	public static class OrderItemFact {
+		public String orderItemSk;
+		public String orderSk;
+		public String bookSk;
+		public String customerSk;
+		public Integer orderItemId;
+		public Integer quantity;
+		public Double priceAtPurchase;
+		public Double discount;
+		public Long transactionTime;
+		public Double priceTotal;
+	}
 
-    public static class OrderItemJsonParser implements MapFunction<String, OrderItem> {
-        private final ObjectMapper objectMapper = new ObjectMapper();
+	public static class OrderItem extends DebeziumSourceRecord {
+		public Integer orderItemId;
+		public Integer orderId;
+		public Integer bookId;
+		public Integer quantity;
+		public Double priceAtPurchase;
+		public Double discount;
+		public Long emittedTsMs;
+		public String connectorVersion;
+		public String transactionId;
+		public Long lsn;
+	}
 
-        private double base64ToScaledDouble(String base64String, int scale) {
-            byte[] decoded = Base64.getDecoder().decode(base64String);
-            if (decoded.length < 8) {
-                return 0.0;
-            }
-            double value = ByteBuffer.wrap(decoded).getDouble();
-            BigDecimal bd = BigDecimal.valueOf(value)
-                    .setScale(scale, RoundingMode.HALF_UP);
-            return bd.doubleValue();
-        }
+	public static class OrderItemJsonParser implements MapFunction<String, OrderItem> {
+		private final ObjectMapper objectMapper = new ObjectMapper();
 
-        @Override
-        public OrderItem map(String jsonString) throws Exception {
-            JsonNode node = objectMapper.readTree(jsonString);
-            OrderItem orderItem = new OrderItem();
+		public static double base64ToScaledDouble(String base64EncodedValue, int scale) {
+			if (base64EncodedValue == null || base64EncodedValue.isEmpty()) {
+				throw new IllegalArgumentException("Input string cannot be null or empty.");
+			}
+			byte[] decodedBytes;
+			try {
+				decodedBytes = Base64.getDecoder().decode(base64EncodedValue);
+			} catch (IllegalArgumentException e) {
+				throw new IllegalArgumentException("Invalid Base64 string.", e);
+			}
+			BigInteger bigInteger = new BigInteger(1, decodedBytes);
+			return bigInteger.doubleValue() / scale;
+		}
 
-            if (node.get("order_item_id") == null) {
-                return orderItem;
-            }
+		@Override
+		public OrderItem map(String jsonString) throws Exception {
+			JsonNode node = objectMapper.readTree(jsonString);
+			OrderItem orderItem = new OrderItem();
 
-            orderItem.orderItemId = node.get("order_item_id").asInt();
-            orderItem.orderId = node.get("order_id").asInt();
-            orderItem.bookId = node.get("book_id").asInt();
-            orderItem.quantity = node.get("quantity").asInt();
-            orderItem.priceAtPurchase = base64ToScaledDouble(node.get("price_at_purchase").asText(), 2);
-            orderItem.discount = base64ToScaledDouble(node.get("discount").asText(), 2);
+			orderItem.orderItemId = node.get("order_item_id").asInt();
+			orderItem.orderId = node.get("order_id").asInt();
+			orderItem.bookId = node.get("book_id").asInt();
+			orderItem.quantity = node.get("quantity").asInt();
+			orderItem.priceAtPurchase = CommonFunctions.base64ToScaledDouble(node.get("price_at_purchase").asText(), 2);
+			orderItem.discount = CommonFunctions.base64ToScaledDouble(node.get("discount").asText(), 2);
 
-            orderItem.op = node.get("op").asText();
-            orderItem.emittedTsMs = node.get("emitted_ts_ms").asLong();
-            orderItem.tsMs = node.get("ts_ms").asLong();
-            orderItem.connectorVersion = node.get("connector_version").asText();
-            orderItem.transactionId = node.get("transaction_id").asText();
-            orderItem.lsn = node.get("lsn").asLong();
+			orderItem.op = node.get("op").asText();
+			orderItem.emittedTsMs = node.get("emitted_ts_ms").asLong();
+			orderItem.tsMs = node.get("ts_ms").asLong();
+			orderItem.connectorVersion = node.get("connector_version").asText();
+			orderItem.transactionId = node.get("transaction_id").asText();
+			orderItem.lsn = node.get("lsn").asLong();
 
-            return orderItem;
-        }
-    }
+			return orderItem;
+		}
+	}
 
-    public static class OrderItemOrderJoinFunction
-            extends FactDimensionJoiner<OrderItem, OrderDimension, OrderItemWithOrder> {
-        public OrderItemOrderJoinFunction() {
-            super(TypeInformation.of(OrderItem.class), TypeInformation.of(OrderDimension.class));
-        }
+	public static void main(String[] args) throws Exception {
+		String groupId = System.getenv("GROUP_ID");
+		String sourceTopic = OrderItemsLandingJob.sinkTopic;
+		String sinkTopic = TopicNameBuilder.build("facts.order_items");
 
-        public OrderItemWithOrder createJoinedDimension(OrderItem orderItem, OrderDimension order) {
-            OrderItemWithOrder joinedRecord = OrderItemWithOrder.createJoinedRecord(orderItem, order);
-            return joinedRecord;
-        }
-    }
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-    public static class OrderItemCustomerJoinFunction
-            extends FactDimensionJoiner<OrderItemWithOrder, CustomerDimension, OrderItemWithCustomer> {
-        public OrderItemCustomerJoinFunction() {
-            super(TypeInformation.of(OrderItemWithOrder.class), TypeInformation.of(CustomerDimension.class));
-        }
+		// Order Dimension
+		String orderDimensionTopic = OrdersDimensionJob.sinkTopic;
+		KafkaSource<OrderDimension> orderDimensionSource = KafkaSource.<OrderDimension>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers).setTopics(orderDimensionTopic)
+				.setGroupId(groupId).setStartingOffsets(OffsetsInitializer.earliest())
+				.setValueOnlyDeserializer(new PojoDeserializer<OrderDimension>(OrderDimension.class)).build();
+		DataStream<OrderDimension> orderDimensionStream = env.fromSource(orderDimensionSource,
+				WatermarkStrategy.<OrderDimension>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((order, timestamp) -> order.validFrom),
+				"Orders Source");
 
-        public OrderItemWithCustomer createJoinedDimension(OrderItemWithOrder orderItem, CustomerDimension customer) {
-            OrderItemWithCustomer joinedRecord = OrderItemWithCustomer.createJoinedRecord(orderItem, customer);
-            return joinedRecord;
-        }
-    }
+		// Customer Dimension
+		String customerDimensionTopic = CustomersDimensionJob.sinkTopic;
+		KafkaSource<CustomerDimension> customerDimensionSource = KafkaSource.<CustomerDimension>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers).setTopics(customerDimensionTopic)
+				.setGroupId(groupId).setStartingOffsets(OffsetsInitializer.earliest())
+				.setValueOnlyDeserializer(new PojoDeserializer<CustomerDimension>(CustomerDimension.class)).build();
+		DataStream<CustomerDimension> customerDimensionStream = env.fromSource(customerDimensionSource,
+				WatermarkStrategy.<CustomerDimension>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((customer, timestamp) -> customer.validFrom),
+				"Customer Source");
 
-    public static class OrderItemBookJoinFunction
-            extends FactDimensionJoiner<OrderItemWithCustomer, BookDimension, OrderItemWithBook> {
-        public OrderItemBookJoinFunction() {
-            super(TypeInformation.of(OrderItemWithCustomer.class), TypeInformation.of(BookDimension.class));
-        }
+		// Book Dimension
+		String bookDimensionTopic = BooksDimensionJob.sinkTopic;
+		KafkaSource<BookDimension> bookDimensionSource = KafkaSource.<BookDimension>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers).setTopics(bookDimensionTopic).setGroupId(groupId)
+				.setStartingOffsets(OffsetsInitializer.earliest())
+				.setValueOnlyDeserializer(new PojoDeserializer<BookDimension>(BookDimension.class)).build();
+		DataStream<BookDimension> bookDimensionStream = env.fromSource(bookDimensionSource,
+				WatermarkStrategy.<BookDimension>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((book, timestamp) -> book.validFrom),
+				"Book Source");
 
-        public OrderItemWithBook createJoinedDimension(OrderItemWithCustomer orderItem, BookDimension book) {
-            OrderItemWithBook joinedRecord = OrderItemWithBook.createJoinedRecord(orderItem, book);
-            return joinedRecord;
-        }
-    }
+		// Order item from Kafka
+		KafkaSource<String> source = KafkaSource.<String>builder().setBootstrapServers(KafkaProperties.bootStrapServers)
+				.setTopics(sourceTopic).setGroupId(groupId).setStartingOffsets(OffsetsInitializer.earliest())
+				.setValueOnlyDeserializer(new SimpleStringSchema()).build();
 
-    public static void main(String[] args) throws Exception {
-        String groupId = System.getenv("GROUP_ID");
-        String sourceTopic = OrdersLandingJob.sinkTopic;
-        String sinkTopic = TopicNameBuilder.build("facts.order_items");
+		DataStream<String> orderItemRawStream = env.fromSource(source,
+				WatermarkStrategy.<String>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((orderItem, timestamp) -> timestamp),
+				"Order item source");
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		DataStream<OrderItem> orderItemStream = orderItemRawStream.map(new OrderItemJsonParser())
+				.name("Parse JSON to Order Item");
 
-        // Order Dimension
-        String orderDimensionTopic = OrdersDimensionJob.sinkTopic;
-        KafkaSource<OrderDimension> orderDimensionSource = KafkaSource.<OrderDimension>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(orderDimensionTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new PojoDeserializer<OrderDimension>(OrderDimension.class))
-                .build();
-        DataStream<OrderDimension> orderDimensionStream = env.fromSource(orderDimensionSource,
-                WatermarkStrategy.noWatermarks(), "Orders Source")
-                .keyBy(order -> order.orderId);
+		// Enrich order item facts
+		DataStream<OrderItemWithOrder> orderItemWithOrders = orderItemStream.keyBy(order -> order.orderId)
+				.intervalJoin(orderDimensionStream.keyBy(order -> order.orderId))
+				.between(Duration.ofDays(-365 * 100), Duration.ofMillis(100)).process(
+						new ProcessJoinFunction<OrderItemsFactJob.OrderItem, OrdersDimensionJob.OrderDimension, OrderItemWithOrder>() {
+							@Override
+							public void processElement(OrderItem left, OrderDimension right, Context ctx,
+									Collector<OrderItemWithOrder> out) {
+								if (left.tsMs >= right.validFrom & left.tsMs < right.validTo) {
+									OrderItemWithOrder orderItemJoined = OrderItemWithOrder.createJoinedRecord(left,
+											right);
+									out.collect(orderItemJoined);
+								}
+							}
+						});
 
-        // Customer Dimension
-        String customerDimensionTopic = CustomersDimensionJob.sinkTopic;
-        KafkaSource<CustomerDimension> customerDimensionSource = KafkaSource.<CustomerDimension>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(customerDimensionTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new PojoDeserializer<CustomerDimension>(CustomerDimension.class))
-                .build();
-        DataStream<CustomerDimension> customerDimensionStream = env.fromSource(customerDimensionSource,
-                WatermarkStrategy.noWatermarks(), "Customer Source")
-                .keyBy(customer -> customer.customerId);
+		DataStream<OrderItemWithCustomer> orderItemWithCustomers = orderItemWithOrders
+				.keyBy(customer -> customer.customerId)
+				.intervalJoin(customerDimensionStream.keyBy(customer -> customer.customerId))
+				.between(Duration.ofDays(-365 * 100), Duration.ofMillis(0))
+				.process(new ProcessJoinFunction<OrderItemWithOrder, CustomerDimension, OrderItemWithCustomer>() {
+					@Override
+					public void processElement(OrderItemWithOrder left, CustomerDimension right, Context ctx,
+							Collector<OrderItemWithCustomer> out) {
+						if (left.tsMs >= right.validFrom & left.tsMs < right.validTo) {
+							OrderItemWithCustomer orderItemJoined = OrderItemWithCustomer.createJoinedRecord(left,
+									right);
+							out.collect(orderItemJoined);
+						}
+					}
+				});
 
-        // Book Dimension
-        String bookDimensionTopic = BooksDimensionJob.sinkTopic;
-        KafkaSource<BookDimension> bookDimensionSource = KafkaSource.<BookDimension>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(bookDimensionTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new PojoDeserializer<BookDimension>(BookDimension.class))
-                .build();
-        DataStream<BookDimension> bookDimensionStream = env.fromSource(bookDimensionSource,
-                WatermarkStrategy.noWatermarks(), "Book Source")
-                .keyBy(book -> book.bookId);
+		DataStream<OrderItemWithBook> orderItemWithBooks = orderItemWithCustomers.keyBy(book -> book.bookId)
+				.intervalJoin(bookDimensionStream.keyBy(book -> book.bookId))
+				.between(Duration.ofDays(-365 * 100), Duration.ofMillis(0))
+				.process(new ProcessJoinFunction<OrderItemWithCustomer, BookDimension, OrderItemWithBook>() {
+					@Override
+					public void processElement(OrderItemWithCustomer left, BookDimension right, Context ctx,
+							Collector<OrderItemWithBook> out) {
+						if (left.tsMs >= right.validFrom & left.tsMs < right.validTo) {
+							OrderItemWithBook orderItemJoined = OrderItemWithBook.createJoinedRecord(left, right);
+							out.collect(orderItemJoined);
+						}
+					}
+				});
 
-        // Order item from Kafka
-        KafkaSource<String> source = KafkaSource.<String>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(sourceTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .build();
+		DataStream<OrderItemFact> orderFacts = orderItemWithBooks.map(new OrderItemFactMapping());
 
-        DataStream<String> orderItemRawStream = env.fromSource(source, WatermarkStrategy.noWatermarks(),
-                "Order item source");
+		KafkaSink<OrderItemFact> streamSink = KafkaSink.<OrderItemFact>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers)
+				.setRecordSerializer(KafkaRecordSerializationSchema.builder().setTopic(sinkTopic)
+						.setValueSerializationSchema(new PojoSerializer<OrderItemFact>()).build())
+				.setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE).build();
 
-        DataStream<OrderItem> orderItemStream = orderItemRawStream.map(new OrderItemJsonParser())
-                .name("Parse JSON to Order Item")
-                .filter(order -> order.orderId != null)
-                .keyBy(orderItem -> orderItem.orderId);
+		JdbcStatementBuilder<OrderItemFact> sinkStatement = (statement, orderItem) -> {
+            statement.setString(1, orderItem.orderItemSk);
+            statement.setString(2, orderItem.orderSk);
+            statement.setString(3, orderItem.bookSk);
+            statement.setString(4, orderItem.customerSk);
+            statement.setInt(5, orderItem.orderItemId);
+            statement.setDouble(6, orderItem.quantity);
+            statement.setDouble(7, orderItem.priceAtPurchase);
+            statement.setDouble(8, orderItem.discount);
+            statement.setLong(9, orderItem.transactionTime);
+            statement.setDouble(10, orderItem.priceTotal);
+		};
 
-        // Enrich order item facts
-        DataStream<OrderItemWithBook> orderItemEnriched = orderItemStream
-                .connect(orderDimensionStream)
-                .process(new OrderItemOrderJoinFunction())
-                .keyBy(customer -> customer.customerId)
-                .connect(customerDimensionStream).process(new OrderItemCustomerJoinFunction())
-                .keyBy(book -> book.bookId)
-                .connect(bookDimensionStream)
-                .process(new OrderItemBookJoinFunction());
+		JdbcSink<OrderItemFact> jdbcSink = JdbcSink.<OrderItemFact>builder().withExecutionOptions(
+				JdbcExecutionOptions.builder().withBatchSize(1000).withBatchIntervalMs(200).withMaxRetries(5).build())
+				.withQueryStatement("""
+						INSERT INTO modeling_db.f_order_items (
+                            orderItemSk,
+                            orderSk,
+                            bookSk,
+                            customerSk,
+                            orderItemId,
+                            quantity,
+                            priceAtPurchase,
+                            discount,
+                            transactionTime,
+                            priceTotal
+                        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+						ON CONFLICT DO NOTHING
+						""", sinkStatement).buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
 
-        DataStream<OrderItemFact> orderFacts = orderItemEnriched.map(new OrderItemFactMapping());
+		orderFacts.sinkTo(jdbcSink);
+        orderFacts.sinkTo(streamSink);
 
-        KafkaSink<OrderItemFact> sink = KafkaSink.<OrderItemFact>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setRecordSerializer(
-                        KafkaRecordSerializationSchema.builder()
-                                .setTopic(sinkTopic)
-                                .setValueSerializationSchema(new PojoSerializer<OrderItemFact>())
-                                .build())
-                .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
-                .build();
-
-        orderFacts.sinkTo(sink);
-
-        env.execute("f_order_items job");
-    }
+		env.execute("f_order_items job");
+	}
 }

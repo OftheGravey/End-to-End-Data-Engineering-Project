@@ -21,7 +21,7 @@ FROM flink:2.0.0-scala_2.12-java21
 # Copy the JAR file
 COPY --from=builder /build/target/flink-extractor-1.0-SNAPSHOT.jar /opt/flink/usrlib/
 
-ENV ENVIRONMENT="dev2"
+ENV ENVIRONMENT="dev11"
 ENV DW_HOST="postgres-dw"
 ENV DW_PORT="5433"
 ENV DW_DB="dw_db"

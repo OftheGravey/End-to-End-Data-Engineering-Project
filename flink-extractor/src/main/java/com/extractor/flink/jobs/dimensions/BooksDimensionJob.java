@@ -1,10 +1,14 @@
 package com.extractor.flink.jobs.dimensions;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.sql.Date;
-import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -36,391 +40,358 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import com.extractor.flink.functions.DebeziumSourceRecord;
 import com.extractor.flink.functions.KafkaProperties;
 import com.extractor.flink.functions.PojoSerializer;
+import com.extractor.flink.functions.SCD2MostValidFunction;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
 import com.extractor.flink.jobs.landing.AuthorsLandingJob;
 import com.extractor.flink.jobs.landing.BooksLandingJob;
+import com.extractor.flink.utils.DWConnectionCommonOptions;
 import com.extractor.flink.utils.TopicNameBuilder;
+import com.extractor.flink.functions.CommonFunctions;
 
 public class BooksDimensionJob {
-    static String groupId = System.getenv("GROUP_ID");
-    public static String sinkTopic = TopicNameBuilder.build("dimensions.books");
+	static String groupId = System.getenv("GROUP_ID");
+	public static String sinkTopic = TopicNameBuilder.build("dimensions.books");
 
-    public static class Book extends DebeziumSourceRecord {
-        public Integer bookId;
-        public String title;
-        public Integer authorId;
-        public String isbn;
-        public Double price;
-        public Date publishedDate;
-        public String description;
-        public String genre;
-        public Integer stock;
-        public Long emittedTsMs;
-        public String connectorVersion;
-        public String transactionId;
-        public Long lsn;
+	public static class Book extends DebeziumSourceRecord {
+		public Integer bookId;
+		public String title;
+		public Integer authorId;
+		public String isbn;
+		public Double price;
+		public Date publishedDate;
+		public String description;
+		public String genre;
+		public Integer stock;
+		public Long emittedTsMs;
+		public String connectorVersion;
+		public String transactionId;
+		public Long lsn;
 
-        // Default constructor
-        public Book() {
-        }
+		// Default constructor
+		public Book() {
+		}
 
-        @Override
-        public String toString() {
-            return String.format("Book{bookId=%d, title='%s', op='%s'}",
-                    bookId, title, op);
-        }
-    }
+		@Override
+		public String toString() {
+			return String.format("Book{bookId=%d, title='%s', op='%s'}", bookId, title, op);
+		}
+	}
 
-    public static class Author extends DebeziumSourceRecord {
-        public Integer authorId;
-        public String firstName;
-        public String lastName;
-        public String biography;
-        public String country;
+	public static class Author extends DebeziumSourceRecord {
+		public Integer authorId;
+		public String firstName;
+		public String lastName;
+		public String biography;
+		public String country;
 
-        public Long emittedTsMs;
-        public String connectorVersion;
-        public String transactionId;
-        public Long lsn;
+		public Long emittedTsMs;
+		public String connectorVersion;
+		public String transactionId;
+		public Long lsn;
 
-        // Default constructor
-        public Author() {
-        }
+		// Default constructor
+		public Author() {
+		}
 
-        @Override
-        public String toString() {
-            return String.format("Book{authorId=%d, firstName='%s', op='%s'}",
-                    authorId, firstName, op);
-        }
-    }
+		@Override
+		public String toString() {
+			return String.format("Book{authorId=%d, firstName='%s', op='%s'}", authorId, firstName, op);
+		}
+	}
 
-    public static class BookAuthor extends DebeziumSourceRecord {
-        // Author
-        public Integer authorId;
-        public String firstName;
-        public String lastName;
-        public String biography;
-        public String country;
-        // Book
-        public Integer bookId;
-        public String title;
-        public String isbn;
-        public Double price;
-        public Date publishedDate;
-        public String description;
-        public String genre;
-        public Integer stock;
+	public static class BookAuthor extends DebeziumSourceRecord {
+		// Author
+		public Integer authorId;
+		public String firstName;
+		public String lastName;
+		public String biography;
+		public String country;
+		// Book
+		public Integer bookId;
+		public String title;
+		public String isbn;
+		public Double price;
+		public Date publishedDate;
+		public String description;
+		public String genre;
+		public Integer stock;
 
-        public Long emittedTsMs;
-        public String connectorVersion;
-        public String transactionId;
-        public Long lsn;
+		public Long emittedTsMs;
+		public String connectorVersion;
+		public String transactionId;
+		public Long lsn;
 
-        // Default constructor
-        public BookAuthor() {
-        }
+		// Default constructor
+		public BookAuthor() {
+		}
 
-        @Override
-        public String toString() {
-            return String.format("Book{authorId=%d, firstName='%s', op='%s'}",
-                    authorId, firstName, op);
-        }
-    }
+		@Override
+		public String toString() {
+			return String.format("Book{authorId=%d, firstName='%s', op='%s'}", authorId, firstName, op);
+		}
+	}
 
-    public static class BookDimension extends TargetDimensionRecord {
-        public Integer bookId;
-        public Integer authorId;
-        public String bookSk;
-        public String title;
-        public String isbn;
-        public Date publishedDate;
-        public String genre;
-        public String authorFirstName;
-        public String authorLastName;
-        public String authorCountry;
-        public Timestamp validFrom;
-        public Timestamp validTo;
+	public static class BookDimension extends TargetDimensionRecord {
+		public Integer bookId;
+		public Integer authorId;
+		public String bookSk;
+		public String title;
+		public String isbn;
+		public Date publishedDate;
+		public String genre;
+		public String authorFirstName;
+		public String authorLastName;
+		public String authorCountry;
 
-        public BookDimension(BookAuthor record, Long validTo) {
-            super(record, validTo);
-            this.bookId = record.bookId;
-            this.authorId = record.authorId;
-            this.title = record.title;
-            this.isbn = record.isbn;
-            this.publishedDate = record.publishedDate;
-            this.genre = record.genre;
-            this.authorFirstName = record.firstName;
-            this.authorLastName = record.lastName;
-            this.authorCountry = record.country;
-            this.bookSk = UUID.randomUUID().toString();
-            this.validFrom = new Timestamp(record.tsMs);
-            this.validTo = new Timestamp(validTo);
-        }
+		public BookDimension(BookAuthor record, Long validTo) {
+			super(record, validTo);
+			this.bookId = record.bookId;
+			this.authorId = record.authorId;
+			this.title = record.title;
+			this.isbn = record.isbn;
+			this.publishedDate = record.publishedDate;
+			this.genre = record.genre;
+			this.authorFirstName = record.firstName;
+			this.authorLastName = record.lastName;
+			this.authorCountry = record.country;
+			this.bookSk = UUID.randomUUID().toString();
+		}
 
-        public BookDimension() {};
+		public BookDimension() {
+		};
 
-        @Override
-        public BookDimension clone(Timestamp validTo) {
-            BookDimension newRecord = new BookDimension();
-            newRecord.bookId = this.bookId;
-            newRecord.authorId = this.authorId;
-            newRecord.title = this.title;
-            newRecord.isbn = this.isbn;
-            newRecord.publishedDate = this.publishedDate;
-            newRecord.genre = this.genre;
-            newRecord.authorFirstName = this.authorFirstName;
-            newRecord.authorLastName = this.authorLastName;
-            newRecord.authorCountry = this.authorCountry;
-            newRecord.bookSk = this.bookSk;
-            newRecord.validFrom = this.validFrom;
-            newRecord.validTo = validTo;
-            return newRecord;
-        }
-    }
+		@Override
+		public BookDimension clone(Long validTo) {
+			BookDimension newRecord = new BookDimension();
+			newRecord.bookId = this.bookId;
+			newRecord.authorId = this.authorId;
+			newRecord.title = this.title;
+			newRecord.isbn = this.isbn;
+			newRecord.publishedDate = this.publishedDate;
+			newRecord.genre = this.genre;
+			newRecord.authorFirstName = this.authorFirstName;
+			newRecord.authorLastName = this.authorLastName;
+			newRecord.authorCountry = this.authorCountry;
+			newRecord.bookSk = this.bookSk;
+			newRecord.validFrom = this.validFrom;
+			newRecord.validTo = validTo;
+			return newRecord;
+		}
+	}
 
-    public static class BooksSCD2ProcessFunction extends SCD2ProcessFunction<BookAuthor, BookDimension> {
-        public BooksSCD2ProcessFunction() {
-            super(TypeInformation.of(BookAuthor.class), TypeInformation.of(BookDimension.class),
-                    BookDimension::new);
-        }
-    }
+	public static class BooksSCD2ProcessFunction extends SCD2ProcessFunction<BookAuthor, BookDimension> {
+		public BooksSCD2ProcessFunction() {
+			super(TypeInformation.of(BookAuthor.class), TypeInformation.of(BookDimension.class), BookDimension::new);
+		}
+	}
 
-    public static class BookJsonParser implements MapFunction<String, Book> {
-        private final ObjectMapper objectMapper = new ObjectMapper();
+	public static class BooksSCD2MostValidFunction extends SCD2MostValidFunction<BookDimension> {
+		public BooksSCD2MostValidFunction() {
+			super(TypeInformation.of(BookDimension.class));
+		}
+	}
 
-        private double base64ToScaledDouble(String base64String, int scale) {
-            byte[] decoded = Base64.getDecoder().decode(base64String);
-            if (decoded.length < 8) {
-                return 0.0;
-            }
-            double value = ByteBuffer.wrap(decoded).getDouble();
-            BigDecimal bd = BigDecimal.valueOf(value)
-                    .setScale(scale, RoundingMode.HALF_UP);
-            return bd.doubleValue();
-        }
+	public static class BookJsonParser implements MapFunction<String, Book> {
+		private final ObjectMapper objectMapper = new ObjectMapper();
 
-        private Date convertDaysToSqlDate(int daysSinceEpoch) {
-            long milliseconds = (long) daysSinceEpoch * 24 * 60 * 60 * 1000;
-            return new Date(milliseconds);
-        }
+		@Override
+		public Book map(String jsonString) throws Exception {
+			JsonNode node = objectMapper.readTree(jsonString);
+			Book book = new Book();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-        @Override
-        public Book map(String jsonString) throws Exception {
-            JsonNode node = objectMapper.readTree(jsonString);
-            Book book = new Book();
+			book.bookId = node.get("book_id").asInt();
+			book.title = node.get("title").asText();
+			book.authorId = node.get("author_id").asInt();
+			book.isbn = node.get("isbn").asText();
+			book.price = CommonFunctions.base64ToScaledDouble(node.get("price").asText(), 2);
+			book.publishedDate = Date.valueOf(LocalDate.parse(node.get("published_date").asText(), formatter));
+			book.description = node.get("description").asText();
+			book.genre = node.get("genre").asText();
+			book.stock = node.get("stock").asInt();
+			book.op = node.get("op").asText();
+			book.emittedTsMs = node.get("emitted_ts_ms").asLong();
+			book.tsMs = node.get("ts_ms").asLong();
+			book.connectorVersion = node.get("connector_version").asText();
+			book.transactionId = node.get("transaction_id").asText();
+			book.lsn = node.get("lsn").asLong();
 
-            book.bookId = node.get("book_id").asInt();
-            book.title = node.get("title").asText();
-            book.authorId = node.get("author_id").asInt();
-            book.isbn = node.get("isbn").asText();
-            book.price = base64ToScaledDouble(node.get("price").asText(), 2);
-            book.publishedDate = convertDaysToSqlDate(node.get("published_date").asInt());
-            book.description = node.get("description").asText();
-            book.genre = node.get("genre").asText();
-            book.stock = node.get("stock").asInt();
-            book.op = node.get("op").asText();
-            book.emittedTsMs = node.get("emitted_ts_ms").asLong();
-            book.tsMs = node.get("ts_ms").asLong();
-            book.connectorVersion = node.get("connector_version").asText();
-            book.transactionId = node.get("transaction_id").asText();
-            book.lsn = node.get("lsn").asLong();
+			return book;
+		}
+	}
 
-            return book;
-        }
-    }
+	public static class AuthorJsonParser implements MapFunction<String, Author> {
+		private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public static class AuthorJsonParser implements MapFunction<String, Author> {
-        private final ObjectMapper objectMapper = new ObjectMapper();
+		@Override
+		public Author map(String jsonString) throws Exception {
+			JsonNode node = objectMapper.readTree(jsonString);
+			Author author = new Author();
 
-        @Override
-        public Author map(String jsonString) throws Exception {
-            JsonNode node = objectMapper.readTree(jsonString);
-            Author author = new Author();
+			author.authorId = node.get("author_id").asInt();
+			author.firstName = node.get("first_name").asText();
+			author.lastName = node.get("last_name").asText();
+			author.biography = node.get("biography").asText();
+			author.country = node.get("country").asText();
 
-            author.authorId = node.get("author_id").asInt();
-            author.firstName = node.get("first_name").asText();
-            author.lastName = node.get("last_name").asText();
-            author.biography = node.get("biography").asText();
-            author.country = node.get("country").asText();
+			author.op = node.get("op").asText();
+			author.emittedTsMs = node.get("emitted_ts_ms").asLong();
+			author.tsMs = node.get("ts_ms").asLong();
+			author.connectorVersion = node.get("connector_version").asText();
+			author.transactionId = node.get("transaction_id").asText();
+			author.lsn = node.get("lsn").asLong();
 
-            author.op = node.get("op").asText();
-            author.emittedTsMs = node.get("emitted_ts_ms").asLong();
-            author.tsMs = node.get("ts_ms").asLong();
-            author.connectorVersion = node.get("connector_version").asText();
-            author.transactionId = node.get("transaction_id").asText();
-            author.lsn = node.get("lsn").asLong();
+			return author;
+		}
+	}
 
-            return author;
-        }
-    }
+	public static class BookAuthorJoinFunction extends KeyedCoProcessFunction<Integer, Book, Author, BookAuthor> {
+		// State to store the latest book and author records for each authorId
+		private transient MapState<Integer, Book> latestBookState;
+		private transient ValueState<Author> latestAuthorState;
 
-    public static class BookAuthorJoinFunction extends KeyedCoProcessFunction<Integer, Book, Author, BookAuthor> {
-        // State to store the latest book and author records for each authorId
-        private transient MapState<Integer, Book> latestBookState;
-        private transient ValueState<Author> latestAuthorState;
+		@Override
+		public void open(OpenContext ctx) throws Exception {
+			latestBookState = getRuntimeContext().getMapState(new MapStateDescriptor<>("latestBookState",
+					TypeInformation.of(Integer.class), TypeInformation.of(Book.class)));
+			latestAuthorState = getRuntimeContext()
+					.getState(new ValueStateDescriptor<>("latestAuthor", TypeInformation.of(Author.class)));
+		}
 
-        @Override
-        public void open(OpenContext ctx) throws Exception {
-            latestBookState = getRuntimeContext().getMapState(
-                    new MapStateDescriptor<>("latestBookState", TypeInformation.of(Integer.class),
-                            TypeInformation.of(Book.class)));
-            latestAuthorState = getRuntimeContext().getState(
-                    new ValueStateDescriptor<>("latestAuthor", TypeInformation.of(Author.class)));
-        }
+		@Override
+		public void processElement1(Book book, Context context, Collector<BookAuthor> out) throws Exception {
+			// A book record arrived. Store it and try to join with the latest author.
+			latestBookState.put(book.bookId, book);
 
-        @Override
-        public void processElement1(Book book, Context context, Collector<BookAuthor> out)
-                throws Exception {
-            // A book record arrived. Store it and try to join with the latest author.
-            latestBookState.put(book.bookId, book);
+			Author currentAuthor = latestAuthorState.value();
+			if (currentAuthor != null) {
+				out.collect(createJoinedDimension(book, currentAuthor));
+			}
+			// If author is not yet available, we just store the book and wait.
+			// You might set a timer here to handle cases where author never arrives.
+		}
 
-            Author currentAuthor = latestAuthorState.value();
-            if (currentAuthor != null) {
-                out.collect(createJoinedDimension(book, currentAuthor));
-            }
-            // If author is not yet available, we just store the book and wait.
-            // You might set a timer here to handle cases where author never arrives.
-        }
+		@Override
+		public void processElement2(Author author, Context context, Collector<BookAuthor> out) throws Exception {
+			// An author record arrived. Store it.
+			latestAuthorState.update(author);
 
-        @Override
-        public void processElement2(Author author, Context context, Collector<BookAuthor> out)
-                throws Exception {
-            // An author record arrived. Store it.
-            latestAuthorState.update(author);
+			Iterable<Map.Entry<Integer, Book>> books = latestBookState.entries();
+			if (books != null) {
+				for (Map.Entry<Integer, Book> entry : books) {
+					Book currentBook = entry.getValue();
+					out.collect(createJoinedDimension(currentBook, author));
+				}
+			}
+		}
 
-            Iterable<Map.Entry<Integer, Book>> books = latestBookState.entries();
-            if (books != null) {
-                for (Map.Entry<Integer, Book> entry : books) {
-                    Book currentBook = entry.getValue();
-                    out.collect(createJoinedDimension(currentBook, author));
-                }
-            }
-        }
+		private BookAuthor createJoinedDimension(Book book, Author author) {
+			BookAuthor dim = new BookAuthor();
+			dim.bookId = book.bookId;
+			dim.authorId = author.authorId;
+			dim.title = book.title;
+			dim.isbn = book.isbn;
+			dim.publishedDate = book.publishedDate;
+			dim.genre = book.genre;
+			dim.firstName = author.firstName;
+			dim.lastName = author.lastName;
+			dim.country = author.country;
+			// Debezium fields from book best for scd2 management
+			dim.op = book.op;
+			dim.tsMs = book.tsMs;
+			dim.emittedTsMs = book.emittedTsMs;
+			dim.connectorVersion = book.connectorVersion;
+			dim.transactionId = book.transactionId;
+			dim.lsn = book.lsn;
+			return dim;
+		}
+	}
 
-        private BookAuthor createJoinedDimension(Book book, Author author) {
-            BookAuthor dim = new BookAuthor();
-            dim.bookId = book.bookId;
-            dim.authorId = author.authorId;
-            dim.title = book.title;
-            dim.isbn = book.isbn;
-            dim.publishedDate = book.publishedDate;
-            dim.genre = book.genre;
-            dim.firstName = author.firstName;
-            dim.lastName = author.lastName;
-            dim.country = author.country;
-            // Debezium fields from book best for scd2 management
-            dim.op = book.op;
-            dim.tsMs = book.tsMs;
-            dim.emittedTsMs = book.emittedTsMs;
-            dim.connectorVersion = book.connectorVersion;
-            dim.transactionId = book.transactionId;
-            dim.lsn = book.lsn;
-            return dim;
-        }
-    }
+	public static void main(String[] args) throws Exception {
+		String bookSourceTopic = BooksLandingJob.sinkTopic;
+		String authorSourceTopic = AuthorsLandingJob.sinkTopic;
 
-    public static void main(String[] args) throws Exception {
-        String bookSourceTopic = BooksLandingJob.sinkTopic;
-        String authorSourceTopic = AuthorsLandingJob.sinkTopic;
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		// Books Streams
+		KafkaSource<String> bookSource = KafkaSource.<String>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers).setTopics(bookSourceTopic).setGroupId(groupId)
+				.setStartingOffsets(OffsetsInitializer.earliest()).setValueOnlyDeserializer(new SimpleStringSchema())
+				.build();
 
-        // Books Streams
-        KafkaSource<String> bookSource = KafkaSource.<String>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(bookSourceTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .build();
+		DataStream<String> bookRawStream = env.fromSource(bookSource,
+				WatermarkStrategy.<String>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((book, timestamp) -> timestamp),
+				"Books Source");
 
-        DataStream<String> bookRawStream = env.fromSource(bookSource,
-                WatermarkStrategy.noWatermarks(),
-                "Books Source");
+		DataStream<Book> bookStream = bookRawStream.map(new BookJsonParser()).name("Parse JSON to Book")
+				.keyBy(book -> book.authorId);
 
-        DataStream<Book> bookStream = bookRawStream
-                .map(new BookJsonParser())
-                .name("Parse JSON to Book")
-                .keyBy(book -> book.authorId);
+		// Author Stream
+		KafkaSource<String> authorSource = KafkaSource.<String>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers).setTopics(authorSourceTopic).setGroupId(groupId)
+				.setStartingOffsets(OffsetsInitializer.earliest()).setValueOnlyDeserializer(new SimpleStringSchema())
+				.build();
 
-        // Author Stream
-        KafkaSource<String> authorSource = KafkaSource.<String>builder()
-                .setBootstrapServers(KafkaProperties.bootStrapServers)
-                .setTopics(authorSourceTopic)
-                .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .build();
+		DataStream<String> authorRawStream = env.fromSource(authorSource,
+				WatermarkStrategy.<String>forBoundedOutOfOrderness(Duration.ofSeconds(30))
+						.withTimestampAssigner((author, timestamp) -> timestamp),
+				"Author Source");
 
-        DataStream<String> authorRawStream = env.fromSource(authorSource,
-                WatermarkStrategy.noWatermarks(),
-                "Author Source");
+		DataStream<Author> authorStream = authorRawStream.map(new AuthorJsonParser()).name("Parse JSON to Book")
+				.keyBy(author -> author.authorId);
 
-        DataStream<Author> authorStream = authorRawStream
-                .map(new AuthorJsonParser())
-                .name("Parse JSON to Book")
-                .keyBy(author -> author.authorId);
+		// Join Stream
+		DataStream<BookAuthor> bookAuthorStream = bookStream.connect(authorStream)
+				.process(new BookAuthorJoinFunction());
 
-        // Join Stream
-        DataStream<BookAuthor> bookAuthorStream = bookStream.connect(authorStream)
-                .process(new BookAuthorJoinFunction());
+		DataStream<BookDimension> scd2Stream = bookAuthorStream.keyBy(record -> record.bookId)
+				.process(new BooksSCD2ProcessFunction()).name("SCD2 Transformation");
 
-        // bookAuthorStream.print();
+		DataStream<BookDimension> scd2StreamWatermarked = scd2Stream.assignTimestampsAndWatermarks(
+				WatermarkStrategy.<BookDimension>forBoundedOutOfOrderness(Duration.ofSeconds(10))
+						.withTimestampAssigner((record, timestamp) -> record.validFrom));
 
-        DataStream<BookDimension> scd2Stream = bookAuthorStream
-                .keyBy(record -> record.bookId)
-                .process(new BooksSCD2ProcessFunction())
-                .name("SCD2 Transformation");
+		DataStream<BookDimension> bookStreamConsolidated = scd2StreamWatermarked.keyBy(record -> record.bookSk)
+				.process(new BooksSCD2MostValidFunction()).name("Consolidate dimension records");
 
+		KafkaSink<BookDimension> streamSink = KafkaSink.<BookDimension>builder()
+				.setBootstrapServers(KafkaProperties.bootStrapServers)
+				.setRecordSerializer(KafkaRecordSerializationSchema.builder().setTopic(sinkTopic)
+						.setValueSerializationSchema(new PojoSerializer<BookDimension>()).build())
+				.setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE).build();
 
-        KafkaSink<BookDimension> sink = KafkaSink.<BookDimension>builder()
-            .setBootstrapServers(KafkaProperties.bootStrapServers)
-            .setRecordSerializer(
-                KafkaRecordSerializationSchema.builder()
-                .setTopic(sinkTopic)
-                .setValueSerializationSchema(new PojoSerializer<BookDimension>())
-                .build()
-            )
-            .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
-            .build();
+		JdbcStatementBuilder<BookDimension> sinkStatement = (statement, book) -> {
+			statement.setString(1, book.bookSk);
+			statement.setInt(2, book.bookId);
+			statement.setInt(3, book.authorId);
+			statement.setString(4, book.title);
+			statement.setString(5, book.isbn);
+			statement.setDate(6, book.publishedDate);
+			statement.setString(7, book.genre);
+			statement.setString(8, book.authorFirstName);
+			statement.setString(9, book.authorLastName);
+			statement.setString(10, book.authorCountry);
+			statement.setLong(11, book.validFrom);
+			statement.setLong(12, book.validTo);
+		};
 
-        // JdbcStatementBuilder<BookDimension> sinkStatement = (statement, book) -> {
-        //     statement.setString(1, book.bookSk);
-        //     statement.setInt(2, book.bookId);
-        //     statement.setInt(3, book.authorId);
-        //     statement.setString(4, book.title);
-        //     statement.setString(5, book.isbn);
-        //     statement.setDate(6, book.publishedDate);
-        //     statement.setString(7, book.genre);
-        //     statement.setString(8, book.authorFirstName);
-        //     statement.setString(9, book.authorLastName);
-        //     statement.setString(10, book.authorCountry);
-        //     statement.setTimestamp(11, book.validFrom);
-        //     statement.setTimestamp(12, book.validTo);
-        // };
+		JdbcSink<BookDimension> jdbcSink = JdbcSink.<BookDimension>builder().withExecutionOptions(
+				JdbcExecutionOptions.builder().withBatchSize(1000).withBatchIntervalMs(200).withMaxRetries(5).build())
+				.withQueryStatement("""
+						INSERT INTO modeling_db.d_books (
+						bookSk, bookId, authorId, title, isbn, publishedDate, genre,
+						authorFirstName, authorLastName, authorCountry, validFrom, validTo
+						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						ON CONFLICT (bookSk) DO UPDATE SET
+						validTo = EXCLUDED.validTo
+						""", sinkStatement).buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
 
-        // JdbcSink<BookDimension> sink = JdbcSink.<BookDimension>builder()
-        //         .withExecutionOptions(JdbcExecutionOptions.builder()
-        //                 .withBatchSize(1000)
-        //                 .withBatchIntervalMs(200)
-        //                 .withMaxRetries(5)
-        //                 .build())
-        //         .withQueryStatement(
-        //                 """
-        //                 INSERT INTO modeling_db.d_books (
-        //                     bookSk, bookId, authorId, title, isbn, publishedDate, genre,
-        //                     authorFirstName, authorLastName, authorCountry, validFrom, validTo
-        //                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        //                     ON CONFLICT (bookSk) DO UPDATE SET
-        //                         validTo = EXCLUDED.validTo 
-        //                 """,
-        //                 sinkStatement)
-        //         .buildAtLeastOnce(DWConnectionCommonOptions.commonOptions);
+		bookStreamConsolidated.sinkTo(streamSink);
+		bookStreamConsolidated.sinkTo(jdbcSink);
 
-        scd2Stream.sinkTo(sink);
+		env.execute("d_books job");
 
-        env.execute("d_books job");
-
-    }
+	}
 }
