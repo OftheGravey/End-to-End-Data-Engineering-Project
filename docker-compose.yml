@@ -63,9 +63,10 @@ services:
     ports:
       - 8083:8083
   jobmanager:
+    build:
+      context: .
+      dockerfile: ./flink-extractor/Dockerfile
     image: flink-extractor:latest 
-    links: 
-      - postgres-dw
     ports:
       - "8081:8081"
     command: jobmanager
@@ -79,7 +80,10 @@ services:
       - DW_PORT=${DW_PORT}
       - DW_DATABASE=${DW_DATABASE}
       - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
-  taskmanager:
+  taskmanager-1:
+    build:
+      context: .
+      dockerfile: ./flink-extractor/Dockerfile
     image: flink-extractor:latest 
     links: 
       - postgres-dw
@@ -91,31 +95,59 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 9
+        taskmanager.numberOfTaskSlots: 15
       - DW_USERNAME=${DW_USERNAME}
       - DW_PASSWORD=${DW_PASSWORD}
       - DW_HOSTNAME=${DW_HOSTNAME}
       - DW_PORT=${DW_PORT}
       - DW_DATABASE=${DW_DATABASE}
       - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
-  sql-client:
+      - FLINK_PROPERTIES_TASKMANAGER_MEMORY_PROCESS_SIZE=4g
+  taskmanager-2:
+    build:
+      context: .
+      dockerfile: ./flink-extractor/Dockerfile
     image: flink-extractor:latest 
-    command: sql-client.sh
     links: 
       - postgres-dw
     depends_on:
       - jobmanager
+    command: taskmanager
+    scale: 1
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
-        rest.address: jobmanager
+        taskmanager.numberOfTaskSlots: 15
       - DW_USERNAME=${DW_USERNAME}
       - DW_PASSWORD=${DW_PASSWORD}
       - DW_HOSTNAME=${DW_HOSTNAME}
       - DW_PORT=${DW_PORT}
       - DW_DATABASE=${DW_DATABASE}
       - BOOTSTRAP_SERVERS=${BOOTSTRAP_SERVERS}
+      - FLINK_PROPERTIES_TASKMANAGER_MEMORY_PROCESS_SIZE=4g
+## Dagster has been configured with a single container.
+## Normal deployments would include a separate daemon container.
+## This wasn't done as the footprint on Dagster is quite small. It is only used to track Flink jobs.
+## See usual docker deployments here: https://docs.dagster.io/deployment/oss/deployment-options/docker
+  # dagster-user-code:
+  #   build:
+  #       context: .
+  #       dockerfile: dagster_code/Dockerfile
+  #   networks:
+  #     - dagster-network
+  dagster:
+    build:
+        context: .
+        dockerfile: dagster/Dockerfile
+    container_name: dagster
+    expose:
+      - '3000'
+    ports:
+      - '3000:3000'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/io_manager_storage:/tmp/io_manager_storage
 volumes:
   shared-tmpfs:
     driver: local

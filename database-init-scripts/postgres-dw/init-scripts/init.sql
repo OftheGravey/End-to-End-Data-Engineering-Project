@@ -2,7 +2,99 @@ CREATE SCHEMA landing_db;
 CREATE SCHEMA staging_db;
 CREATE SCHEMA modeling_db;
 
--- store_db
+-- Book Dimension 
+-- SCD 2
+CREATE TABLE IF NOT EXISTS modeling_db.d_books (
+    bookSk VARCHAR PRIMARY KEY,
+    bookId Integer,
+    authorId Integer,
+    title VARCHAR,
+    isbn VARCHAR,
+    publishedDate DATE,
+    genre VARCHAR,
+    authorFirstName VARCHAR,
+    authorLastName VARCHAR,
+    authorCountry VARCHAR,
+    validFrom BIGINT,
+    validTo BIGINT
+);
+
+-- Carrier Services
+-- SCD 2
+CREATE TABLE IF NOT EXISTS modeling_db.d_carrier_services (
+    carrierServiceSk VARCHAR PRIMARY KEY,
+    serviceName VARCHAR,
+    carrierName VARCHAR, 
+    serviceId VARCHAR,
+    carrierContactEmail VARCHAR,
+    carrierPhone VARCHAR,
+    estimatedDays Integer,
+    costEstimate FLOAT,
+    validFrom BIGINT,
+    validTo BIGINT
+);
+
+-- Customer Dimension
+-- SCD 2
+CREATE TABLE IF NOT EXISTS modeling_db.d_customers (
+    customerSk VARCHAR PRIMARY KEY,
+    customerId INTEGER,
+    email VARCHAR,
+    phone VARCHAR,
+    streetAddress VARCHAR,
+    city VARCHAR,
+    state VARCHAR,
+    postalCode VARCHAR,
+    country VARCHAR,
+    firstName VARCHAR,
+    lastName VARCHAR,
+    validFrom BIGINT,
+    validTo BIGINT
+);
+
+-- Orders Dimension
+-- SCD 2
+CREATE TABLE IF NOT EXISTS modeling_db.d_orders (
+    orderSk VARCHAR PRIMARY KEY,
+    orderId INTEGER,
+    status VARCHAR,
+    shippingMethod VARCHAR,
+    orderDate DATE,
+    validFrom BIGINT,
+    validTo BIGINT
+);
+
+-- Order Items events facts
+CREATE TABLE IF NOT EXISTS modeling_db.f_order_items (
+    orderItemSk VARCHAR,
+    orderSk VARCHAR,
+    bookSk VARCHAR,
+    customerSk VARCHAR,
+    orderItemId INTEGER,
+    quantity INTEGER,
+    priceAtPurchase FLOAT,
+    discount FLOAT,
+    transactionTime BIGINT,
+    priceTotal FLOAT
+);
+
+-- Shipping events fact
+CREATE TABLE IF NOT EXISTS modeling_db.f_shipment_events (
+    shipmentEventSk VARCHAR,
+    orderSk VARCHAR,
+    carrierServiceSk VARCHAR,
+    shipmentId INTEGER,
+    shipmentEventId INTEGER,
+    status VARCHAR,
+    location VARCHAR,
+    trackingNumber VARCHAR,
+    shippingStatus VARCHAR,
+    shippedDate DATE,
+    expectedDeliveryDate DATE,
+    actualDeliveryDate DATE,
+    shippingCost FLOAT
+);
+
 -- AUTHORS
 CREATE TABLE IF NOT EXISTS landing_db.authors (
     author_id INTEGER,

@@ -26,7 +26,8 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
 
     @BeforeEach
     public void setup() throws Exception {
-        processFunction = new SCD2ProcessFunction<Order, OrderDimension>(TypeInformation.of(Order.class), TypeInformation.of(OrderDimension.class), OrderDimension::new);
+        processFunction = new SCD2ProcessFunction<Order, OrderDimension>(TypeInformation.of(Order.class),
+                TypeInformation.of(OrderDimension.class), OrderDimension::new);
 
         // Create the keyed process operator with explicit types
         KeyedProcessOperator<Integer, Order, OrderDimension> operator = new KeyedProcessOperator<>(
@@ -79,7 +80,7 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         testHarness.processElement(record1, record1.tsMs);
         testHarness.processElement(record2, record2.tsMs);
         testHarness.processElement(record3, record3.tsMs);
-        
+
         // Advance time to trigger timer
         testHarness.setProcessingTime(10000L);
 
@@ -98,13 +99,13 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record1.tsMs, secondOutputRecord.validFrom);
         assertEquals(record2.tsMs - 1, secondOutputRecord.validTo);
         assertEquals(record1.status, firstOutputRecord.status);
-        
+
         // Order 1 - record 2 updated
         OrderDimension fourthOutputRecord = (OrderDimension) ((StreamRecord<?>) output.poll()).getValue();
         assertEquals(record2.tsMs, fourthOutputRecord.validFrom);
         assertEquals(END_OF_TIME, fourthOutputRecord.validTo);
         assertEquals(record2.status, fourthOutputRecord.status);
-        
+
         // Order 2 - record 3 created
         OrderDimension thirdOutputRecord = (OrderDimension) ((StreamRecord<?>) output.poll()).getValue();
         assertEquals(record3.tsMs, thirdOutputRecord.validFrom);
@@ -112,7 +113,6 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record3.status, thirdOutputRecord.status);
     }
 
-    
     @Test
     public void testDeleteKeyedStream() throws Exception {
         // Standard un-important values
@@ -139,7 +139,7 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         // Process the record
         testHarness.processElement(record1, record1.tsMs);
         testHarness.processElement(record2, record2.tsMs);
-        
+
         // Advance time to trigger timer
         testHarness.setProcessingTime(10000L);
 
@@ -159,7 +159,6 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record2.tsMs - 1, secondOutputRecord.validTo);
         assertEquals(record1.status, firstOutputRecord.status);
 
-
         // Order 1 - record 1 deleted
         OrderDimension thirdOutputRecord = (OrderDimension) ((StreamRecord<?>) output.poll()).getValue();
         assertEquals(record2.tsMs, thirdOutputRecord.validFrom);
@@ -167,7 +166,7 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record2.status, thirdOutputRecord.status);
     }
 
-        @Test
+    @Test
     public void testMultiInsert() throws Exception {
         // Standard un-important values
         String shippingMethod = "IGNORE";
@@ -202,7 +201,7 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         testHarness.processElement(record1, record1.tsMs);
         testHarness.processElement(record2, record2.tsMs);
         testHarness.processElement(record3, record3.tsMs);
-        
+
         // Advance time to trigger timer
         testHarness.setProcessingTime(10000L);
 
@@ -221,7 +220,6 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record1.tsMs, secondOutputRecord.validFrom);
         assertEquals(record2.tsMs - 1, secondOutputRecord.validTo);
         assertEquals(record1.status, firstOutputRecord.status);
-
 
         // Order 1 - record 1 deleted
         OrderDimension thirdOutputRecord = (OrderDimension) ((StreamRecord<?>) output.poll()).getValue();
@@ -256,7 +254,7 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         // Process the record
         testHarness.processElement(record1, record1.tsMs);
         testHarness.processElement(record2, record2.tsMs);
-        
+
         // Advance time to trigger timer
         testHarness.setProcessingTime(1753177299850L);
 
@@ -275,7 +273,6 @@ public class OrdersDimensionJobTest extends OrdersDimensionJob {
         assertEquals(record1.tsMs, secondOutputRecord.validFrom);
         assertEquals(record2.tsMs - 1, secondOutputRecord.validTo);
         assertEquals(record1.status, firstOutputRecord.status);
-
 
         // Order 1 - record 1 deleted
         OrderDimension thirdOutputRecord = (OrderDimension) ((StreamRecord<?>) output.poll()).getValue();

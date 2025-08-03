@@ -1,6 +1,5 @@
 package com.extractor.flink.jobs.dimensions;
 
-import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.UUID;
@@ -28,8 +27,6 @@ import com.extractor.flink.functions.PojoSerializer;
 import com.extractor.flink.functions.SCD2MostValidFunction;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
-import com.extractor.flink.jobs.dimensions.BooksDimensionJob.BookDimension;
-import com.extractor.flink.jobs.dimensions.OrdersDimensionJob.OrderDimension;
 import com.extractor.flink.jobs.landing.CustomersLandingJob;
 import com.extractor.flink.utils.DWConnectionCommonOptions;
 import com.extractor.flink.utils.TopicNameBuilder;

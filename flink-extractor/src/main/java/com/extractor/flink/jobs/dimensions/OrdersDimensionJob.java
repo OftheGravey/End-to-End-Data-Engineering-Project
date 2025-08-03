@@ -18,7 +18,6 @@ import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +28,6 @@ import com.extractor.flink.functions.PojoSerializer;
 import com.extractor.flink.functions.SCD2MostValidFunction;
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.functions.TargetDimensionRecord;
-import com.extractor.flink.jobs.dimensions.CustomersDimensionJob.CustomerDimension;
 import com.extractor.flink.jobs.landing.OrdersLandingJob;
 import com.extractor.flink.utils.DWConnectionCommonOptions;
 import com.extractor.flink.utils.TopicNameBuilder;
@@ -68,6 +66,7 @@ public class OrdersDimensionJob {
 		// (customerId) A Kimball rule break - needed because order_items does not have
 		// customerId field. So order item facts would not have direct access to
 		// the customer. Can be filtered out in a presentation layer view
+		/// Assuming that an order can only be assigned to a SINGLE UNCHANGING customer.
 		public Integer customerId;
 
 		public OrderDimension(Order record, Long validTo) {
@@ -128,7 +127,7 @@ public class OrdersDimensionJob {
 			order.customerId = node.get("customer_id").asInt();
 			order.orderDate = node.get("order_date").asLong();
 			order.status = node.get("status").asText();
-			order.shippingMethod = node.get("shipping_method") != null ? node.get("shipping_method").asText() : null;
+			order.shippingMethod = node.get("shipping_method").asText();
 			order.op = node.get("op").asText();
 			order.emittedTsMs = node.get("emitted_ts_ms").asLong();
 			order.tsMs = node.get("ts_ms").asLong();
