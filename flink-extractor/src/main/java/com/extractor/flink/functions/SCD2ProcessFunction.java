@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.io.Serializable;
+import java.time.Duration;
 
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
@@ -14,7 +15,7 @@ import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 
 public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends TargetDimensionRecord>
-        extends KeyedProcessFunction<Integer, IN, OUT>{
+        extends KeyedProcessFunction<Integer, IN, OUT> {
 
     private static final long END_OF_TIME = 253402300799000L; // 9999-12-31 in milliseconds
     private static final long BUFFER_TIMEOUT_MS = 10 * 1000;
@@ -24,14 +25,16 @@ public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends Ta
     public ValueState<Long> timerState;
 
     @FunctionalInterface
-    public interface SerializableBiFunction<T, U, R> extends BiFunction<T, U, R>, Serializable {}
+    public interface SerializableBiFunction<T, U, R> extends BiFunction<T, U, R>, Serializable {
+    }
+
     public final SerializableBiFunction<IN, Long, OUT> outputFactory;
-    private final  TypeInformation<IN> inTypeInfo;
-    private final  TypeInformation<OUT> outTypeInfo;
+    private final TypeInformation<IN> inTypeInfo;
+    private final TypeInformation<OUT> outTypeInfo;
 
     public SCD2ProcessFunction(TypeInformation<IN> inTypeInfo,
-                                  TypeInformation<OUT> outTypeInfo,
-                                  SerializableBiFunction<IN, Long, OUT> outputFactory) {
+            TypeInformation<OUT> outTypeInfo,
+            SerializableBiFunction<IN, Long, OUT> outputFactory) {
         this.inTypeInfo = inTypeInfo;
         this.outTypeInfo = outTypeInfo;
         this.outputFactory = outputFactory;
@@ -39,17 +42,22 @@ public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends Ta
 
     @Override
     public void open(OpenContext ctx) throws Exception {
-        currentRecordState = getRuntimeContext().getState(
-            new ValueStateDescriptor<>("currentRecord", outTypeInfo)
-        );
+        StateTtlConfig ttlConfig = StateTtlConfig
+                .newBuilder(Duration.ofSeconds(30))
+                .setUpdateType(StateTtlConfig.UpdateType.OnCreateAndWrite)
+                .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+                .build();
 
-        pendingRecordsState = getRuntimeContext().getMapState(
-            new MapStateDescriptor<>("pendingRecords", TypeInformation.of(Long.class), inTypeInfo)
-        );
+        ValueStateDescriptor<OUT> currentRecordStateDescriptor = new ValueStateDescriptor<>("currentRecord", outTypeInfo);
+        currentRecordStateDescriptor.enableTimeToLive(ttlConfig);
+        currentRecordState = getRuntimeContext().getState(currentRecordStateDescriptor);
+
+        MapStateDescriptor<Long, IN> pendingRecordsStateDescriptor = new MapStateDescriptor<>("pendingRecords", TypeInformation.of(Long.class), inTypeInfo);
+        pendingRecordsStateDescriptor.enableTimeToLive(ttlConfig);
+        pendingRecordsState = getRuntimeContext().getMapState(pendingRecordsStateDescriptor);
 
         timerState = getRuntimeContext().getState(
-            new ValueStateDescriptor<>("timer", Long.class)
-        );
+                new ValueStateDescriptor<>("timer", Long.class));
     }
 
     @Override
@@ -90,7 +98,6 @@ public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends Ta
             }
 
             OUT scd2Record = outputFactory.apply(record, END_OF_TIME);
-
 
             if ("d" != (record.op)) {
                 currentRecordState.update(scd2Record);

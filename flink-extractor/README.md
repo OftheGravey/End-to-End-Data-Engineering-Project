@@ -1,4 +1,1 @@
 ## Flink Extractor
-Designed to extract data from Flink as a replacement for /consumer \
-Apache Flink is used to stream real-time changes to a postgres data warehouse. It pulls data from the above Kafka topics. Some light data processing is applied to change data types from the encoded debezium-json format. \
-Flink SQL has multiple methods of reading from Kafka-Debezium topics. I choose read the messages as raw JSON messages. This gave flexibility on what attributes I could extract from the messages. The `debezium-json` format seems to exclude the `op` field as an option for it's metadata (https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/debezium/). This field was important for downstream processes so that is why I choose to give up the convenience of the pre-processed format. 

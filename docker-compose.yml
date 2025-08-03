@@ -136,13 +136,11 @@ services:
   #       dockerfile: dagster_code/Dockerfile
   #   networks:
   #     - dagster-network
-  dagster-webserver:
+  dagster:
     build:
         context: .
-        dockerfile: dagster_webserver/Dockerfile
-    entrypoint:
-      - /opt/dagster/app/init.sh
-    container_name: dagster_webserver
+        dockerfile: dagster/Dockerfile
+    container_name: dagster
     expose:
       - '3000'
     ports:

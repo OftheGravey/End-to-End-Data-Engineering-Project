@@ -11,6 +11,7 @@ public class BooksLandingJob {
     static String sourceTopic = "pg-changes.public.books";
     public static String sinkTopic = TopicNameBuilder.build("store.books.landing");
     static String groupId = System.getenv("GROUP_ID");
+
     public static void main(String[] args) throws Exception {
 
         // Set up execution environment
@@ -21,11 +22,10 @@ public class BooksLandingJob {
         String createTableDebeziumColumns = PostgresDebeziumColumns.createTableFormat();
 
         String createSourceTableSql = String.format("""
-            CREATE TABLE books (
-                payload STRING
-            ) %s
-            """, sourceProperties);
-        System.out.println(createSourceTableSql);
+                CREATE TABLE books (
+                    payload STRING
+                ) %s
+                """, sourceProperties);
         tableEnv.executeSql(createSourceTableSql);
 
         String sinkProperties = KafkaProperties.build(sinkTopic, groupId);
@@ -44,25 +44,26 @@ public class BooksLandingJob {
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
-        System.out.println(createSinkTableSql);
         tableEnv.executeSql(createSinkTableSql);
+
         String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
-        String insertSinkSql = String.format("""
-                INSERT INTO books_processed
-                SELECT 
-                    CAST(JSON_VALUE(payload, '$.after.book_id') AS INTEGER) AS book_id,
-                    CAST(JSON_VALUE(payload, '$.after.title') AS VARCHAR(50)) AS title,
-                    CAST(JSON_VALUE(payload, '$.after.author_id') AS INTEGER) AS author_id,
-                    CAST(JSON_VALUE(payload, '$.after.isbn') AS VARCHAR(13)) AS isbn,
-                    CAST(JSON_VALUE(payload, '$.after.price') AS STRING) AS price,
-                    CAST(FROM_UNIXTIME((60 * 60 * 24) * CAST(JSON_VALUE(payload, '$.after.published_date') AS INTEGER)) AS DATE) AS published_date,
-                    CAST(JSON_VALUE(payload, '$.after.description') AS VARCHAR(500)) AS description,
-                    CAST(JSON_VALUE(payload, '$.after.genre') AS VARCHAR(50)) AS genre,
-                    CAST(JSON_VALUE(payload, '$.after.stock') AS INTEGER) AS stock,
-                    %s
-                FROM books
-                """, insertTableDebeziumColumns);
-        System.out.println(insertSinkSql);
+        String insertSinkSql = String.format(
+                """
+                        INSERT INTO books_processed
+                        SELECT
+                            CAST(JSON_VALUE(payload, '$.after.book_id') AS INTEGER) AS book_id,
+                            CAST(JSON_VALUE(payload, '$.after.title') AS VARCHAR(50)) AS title,
+                            CAST(JSON_VALUE(payload, '$.after.author_id') AS INTEGER) AS author_id,
+                            CAST(JSON_VALUE(payload, '$.after.isbn') AS VARCHAR(13)) AS isbn,
+                            CAST(JSON_VALUE(payload, '$.after.price') AS STRING) AS price,
+                            CAST(FROM_UNIXTIME((60 * 60 * 24) * CAST(JSON_VALUE(payload, '$.after.published_date') AS INTEGER)) AS DATE) AS published_date,
+                            CAST(JSON_VALUE(payload, '$.after.description') AS VARCHAR(500)) AS description,
+                            CAST(JSON_VALUE(payload, '$.after.genre') AS VARCHAR(50)) AS genre,
+                            CAST(JSON_VALUE(payload, '$.after.stock') AS INTEGER) AS stock,
+                            %s
+                        FROM books
+                        """,
+                insertTableDebeziumColumns);
         tableEnv.executeSql(insertSinkSql);
     }
 }

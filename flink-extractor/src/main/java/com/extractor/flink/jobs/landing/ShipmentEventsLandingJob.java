@@ -1,15 +1,16 @@
 package com.extractor.flink.jobs.landing;
 
 import com.extractor.flink.functions.KafkaProperties;
-import com.extractor.flink.functions.PostgresDebeziumColumns;
+import com.extractor.flink.functions.MySQLDebeziumColumns;
 import com.extractor.flink.utils.TopicNameBuilder;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-public class AuthorsLandingJob {
-    static String sourceTopic = "pg-changes.public.authors";
-    public static String sinkTopic = TopicNameBuilder.build("store.authors.landing");
+public class ShipmentEventsLandingJob {
+
+    static String sourceTopic = "mysql-changes.shipping_db.shipment_events";
+    public static String sinkTopic = TopicNameBuilder.build("shipping.shipment_events.landing");
     static String groupId = System.getenv("GROUP_ID");
 
     public static void main(String[] args) throws Exception {
@@ -19,10 +20,10 @@ public class AuthorsLandingJob {
         final StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
 
         String sourceProperties = KafkaProperties.build(sourceTopic, groupId);
-        String createTableDebeziumColumns = PostgresDebeziumColumns.createTableFormat();
+        String createTableDebeziumColumns = MySQLDebeziumColumns.createTableFormat();
 
         String createSourceTableSql = String.format("""
-                CREATE TABLE authors (
+                CREATE TABLE shipment_events (
                     payload STRING
                 ) %s
                 """, sourceProperties);
@@ -31,28 +32,26 @@ public class AuthorsLandingJob {
         String sinkProperties = KafkaProperties.build(sinkTopic, groupId);
 
         String createSinkTableSql = String.format("""
-                CREATE TABLE authors_processed (
-                    author_id INTEGER,
-                    first_name VARCHAR(255),
-                    last_name VARCHAR(255),
-                    biography VARCHAR(2048),
-                    country VARCHAR(255),
+                CREATE TABLE shipment_events_processed (
+                    event_id INTEGER,
+                    shipment_id INTEGER,
+                    status STRING,
+                    location STRING,
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
         tableEnv.executeSql(createSinkTableSql);
 
-        String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
+        String insertTableDebeziumColumns = MySQLDebeziumColumns.insertTableFormat();
         String insertSinkSql = String.format("""
-                INSERT INTO authors_processed
+                INSERT INTO shipment_events_processed
                 SELECT
-                    CAST(JSON_VALUE(payload, '$.after.author_id') AS INTEGER) AS author_id,
-                    CAST(JSON_VALUE(payload, '$.after.first_name') AS VARCHAR(50)) AS first_name,
-                    CAST(JSON_VALUE(payload, '$.after.last_name') AS VARCHAR(50)) AS last_name,
-                    CAST(JSON_VALUE(payload, '$.after.biography') AS VARCHAR(50)) AS biography,
-                    CAST(JSON_VALUE(payload, '$.after.country') AS VARCHAR(50)) AS country,
+                    CAST(JSON_VALUE(payload, '$.after.event_id') AS INTEGER) AS event_id,
+                    CAST(JSON_VALUE(payload, '$.after.shipment_id') AS INTEGER) AS shipment_id,
+                    CAST(JSON_VALUE(payload, '$.after.status') AS STRING) AS status,
+                    CAST(JSON_VALUE(payload, '$.after.location') AS STRING) AS location,
                     %s
-                FROM authors
+                FROM shipment_events
                 """, insertTableDebeziumColumns);
         tableEnv.executeSql(insertSinkSql);
     }

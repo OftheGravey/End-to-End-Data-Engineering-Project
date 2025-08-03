@@ -11,6 +11,7 @@ public class OrderItemsLandingJob {
     static String sourceTopic = "pg-changes.public.order_items";
     public static String sinkTopic = TopicNameBuilder.build("store.order_items.landing");
     static String groupId = System.getenv("GROUP_ID");
+
     public static void main(String[] args) throws Exception {
 
         // Set up execution environment
@@ -21,11 +22,10 @@ public class OrderItemsLandingJob {
         String createTableDebeziumColumns = PostgresDebeziumColumns.createTableFormat();
 
         String createSourceTableSql = String.format("""
-            CREATE TABLE order_items (
-                payload STRING
-            ) %s
-            """, sourceProperties);
-        System.out.println(createSourceTableSql);
+                CREATE TABLE order_items (
+                    payload STRING
+                ) %s
+                """, sourceProperties);
         tableEnv.executeSql(createSourceTableSql);
 
         String sinkProperties = KafkaProperties.build(sinkTopic, groupId);
@@ -41,13 +41,12 @@ public class OrderItemsLandingJob {
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
-        System.out.println(createSinkTableSql);
         tableEnv.executeSql(createSinkTableSql);
 
         String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
         String insertSinkSql = String.format("""
                 INSERT INTO order_items_processed
-                SELECT 
+                SELECT
                     CAST(JSON_VALUE(payload, '$.after.order_item_id') AS INTEGER) AS order_item_id,
                     CAST(JSON_VALUE(payload, '$.after.order_id') AS INTEGER) AS order_id,
                     CAST(JSON_VALUE(payload, '$.after.book_id') AS INTEGER) AS book_id,
@@ -57,7 +56,6 @@ public class OrderItemsLandingJob {
                     %s
                 FROM order_items
                 """, insertTableDebeziumColumns);
-        System.out.println(insertSinkSql);
         tableEnv.executeSql(insertSinkSql);
     }
 }

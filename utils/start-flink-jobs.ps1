@@ -3,7 +3,15 @@ $JOB_DIR="app/flink_jobs/jobs"
 
 # List of job file names to run
 $jobs = @(
-    "silver_tables.py"
+    "authors_stream.py",
+    "books_stream.py",
+    "customers_stream.py",
+    "order_items_stream.py",
+    "orders_stream.py",
+    "shipping_services_stream.py",
+    "shipments_stream.py",
+    "shipment_events_stream.py",
+    "carriers_stream.py"
 )
 
 # Loop through and run each job in the container

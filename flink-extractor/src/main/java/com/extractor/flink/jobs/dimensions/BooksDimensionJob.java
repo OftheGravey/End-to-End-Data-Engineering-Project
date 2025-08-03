@@ -1,15 +1,9 @@
 package com.extractor.flink.jobs.dimensions;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.RoundingMode;
-import java.nio.ByteBuffer;
 import java.sql.Date;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 
@@ -199,7 +193,7 @@ public class BooksDimensionJob {
 		public Book map(String jsonString) throws Exception {
 			JsonNode node = objectMapper.readTree(jsonString);
 			Book book = new Book();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
 			book.bookId = node.get("book_id").asInt();
 			book.title = node.get("title").asText();
@@ -246,8 +240,10 @@ public class BooksDimensionJob {
 		}
 	}
 
+	// Left join Authors and their books
+	// Authors and books are assumed to be added at the same time
+	// Unmatched records will be ignored and left to the TTL.
 	public static class BookAuthorJoinFunction extends KeyedCoProcessFunction<Integer, Book, Author, BookAuthor> {
-		// State to store the latest book and author records for each authorId
 		private transient MapState<Integer, Book> latestBookState;
 		private transient ValueState<Author> latestAuthorState;
 
@@ -261,20 +257,16 @@ public class BooksDimensionJob {
 
 		@Override
 		public void processElement1(Book book, Context context, Collector<BookAuthor> out) throws Exception {
-			// A book record arrived. Store it and try to join with the latest author.
 			latestBookState.put(book.bookId, book);
 
 			Author currentAuthor = latestAuthorState.value();
 			if (currentAuthor != null) {
 				out.collect(createJoinedDimension(book, currentAuthor));
 			}
-			// If author is not yet available, we just store the book and wait.
-			// You might set a timer here to handle cases where author never arrives.
 		}
 
 		@Override
 		public void processElement2(Author author, Context context, Collector<BookAuthor> out) throws Exception {
-			// An author record arrived. Store it.
 			latestAuthorState.update(author);
 
 			Iterable<Map.Entry<Integer, Book>> books = latestBookState.entries();

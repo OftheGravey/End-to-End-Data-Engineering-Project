@@ -12,6 +12,7 @@ public class OrdersLandingJob {
     static String sourceTopic = "pg-changes.public.orders";
     public static String sinkTopic = TopicNameBuilder.build("store.orders.landing");
     static String groupId = System.getenv("GROUP_ID");
+
     public static void main(String[] args) throws Exception {
 
         // Set up execution environment
@@ -22,11 +23,10 @@ public class OrdersLandingJob {
         String createTableDebeziumColumns = PostgresDebeziumColumns.createTableFormat();
 
         String createSourceTableSql = String.format("""
-            CREATE TABLE orders (
-                payload STRING
-            ) %s
-            """, sourceProperties);
-        System.out.println(createSourceTableSql);
+                CREATE TABLE orders (
+                    payload STRING
+                ) %s
+                """, sourceProperties);
         tableEnv.executeSql(createSourceTableSql);
 
         String sinkProperties = KafkaProperties.build(sinkTopic, groupId);
@@ -41,22 +41,22 @@ public class OrdersLandingJob {
                     %s
                 ) %s
                 """, createTableDebeziumColumns, sinkProperties);
-        System.out.println(createSinkTableSql);
         tableEnv.executeSql(createSinkTableSql);
 
         String insertTableDebeziumColumns = PostgresDebeziumColumns.insertTableFormat();
-        String insertSinkSql = String.format("""
-                INSERT INTO orders_processed
-                SELECT 
-                    CAST(JSON_VALUE(payload, '$.after.order_id') AS INTEGER) AS order_id,
-                    CAST(JSON_VALUE(payload, '$.after.customer_id') AS INTEGER) AS customer_id,
-                    CAST(FROM_UNIXTIME(CAST(JSON_VALUE(payload, '$.after.order_date') AS BIGINT)/1000000) AS TIMESTAMP) AS order_date,
-                    CAST(JSON_VALUE(payload, '$.after.status') AS VARCHAR(20)) AS status,
-                    CAST(JSON_VALUE(payload, '$.after.shipping_method') AS VARCHAR(20)) AS shipping_method,
-                    %s
-                FROM orders
-                """, insertTableDebeziumColumns);
-        System.out.println(insertSinkSql);
+        String insertSinkSql = String.format(
+                """
+                        INSERT INTO orders_processed
+                        SELECT
+                            CAST(JSON_VALUE(payload, '$.after.order_id') AS INTEGER) AS order_id,
+                            CAST(JSON_VALUE(payload, '$.after.customer_id') AS INTEGER) AS customer_id,
+                            CAST(FROM_UNIXTIME(CAST(JSON_VALUE(payload, '$.after.order_date') AS BIGINT)/1000000) AS TIMESTAMP) AS order_date,
+                            CAST(JSON_VALUE(payload, '$.after.status') AS VARCHAR(20)) AS status,
+                            CAST(JSON_VALUE(payload, '$.after.shipping_method') AS VARCHAR(20)) AS shipping_method,
+                            %s
+                        FROM orders
+                        """,
+                insertTableDebeziumColumns);
         tableEnv.executeSql(insertSinkSql);
     }
 }

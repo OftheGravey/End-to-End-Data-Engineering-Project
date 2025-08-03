@@ -38,18 +38,17 @@ public class SCD2LatestDimensionTest {
     @BeforeEach
     public void setup() throws Exception {
         processFunction = new TestSCD2ProcessFunction();
-        
+
         // This value is for tests to make the values more human-readable
         processFunction.timeWindowSizeMs = 50L;
-        
-        KeyedProcessOperator<String, TestDimension, TestDimension> operator = 
-            new KeyedProcessOperator<>(processFunction);
-        
+
+        KeyedProcessOperator<String, TestDimension, TestDimension> operator = new KeyedProcessOperator<>(
+                processFunction);
+
         testHarness = new KeyedOneInputStreamOperatorTestHarness<String, TestDimension, TestDimension>(
                 operator,
                 record -> record.dimensionSk,
-                TypeInformation.of(String.class)
-        );
+                TypeInformation.of(String.class));
         testHarness.open();
     }
 
@@ -67,7 +66,7 @@ public class SCD2LatestDimensionTest {
 
         testHarness.processElement(record1, 10L);
         testHarness.processElement(record2, 20L);
-        
+
         testHarness.processWatermark(50L);
 
         ConcurrentLinkedQueue<Object> output = testHarness.getOutput();
@@ -77,7 +76,7 @@ public class SCD2LatestDimensionTest {
         assertEquals((10L), outputRecord.validFrom);
         assertEquals(19L, outputRecord.validTo);
     }
-    
+
     @Test
     public void testSimpleFlow() throws Exception {
         // Record fired after timer triggered
@@ -87,7 +86,7 @@ public class SCD2LatestDimensionTest {
         record1.validTo = END_OF_TIME;
 
         testHarness.processElement(record1, 10L);
-        
+
         testHarness.processWatermark(50L);
 
         ConcurrentLinkedQueue<Object> output = testHarness.getOutput();
@@ -129,7 +128,5 @@ public class SCD2LatestDimensionTest {
         assertEquals((10L), outputRecord2.validFrom);
         assertEquals(90L, outputRecord2.validTo);
     }
-
-
 
 }
