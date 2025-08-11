@@ -14,6 +14,15 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 
+// Function for building SCD2 from streams
+// I.e. raw records:
+//  {recordId: 1, tsMs: 10}
+//  {recordId: 1, tsMs: 20}
+// Becomes:
+//  {recordSk: A, recordId: 1, validFrom: 10, validTo: inf}
+//  {recordSk: A, recordId: 1, validFrom: 10, validTo: 20}
+//  {recordSk: B, recordId: 1, validFrom: 20, validTo: inf}
+// Consolidating the two recordSk is done via SCD2MostValidFunction and via sink config
 public class SCD2ProcessFunction<IN extends DebeziumSourceRecord, OUT extends TargetDimensionRecord>
         extends KeyedProcessFunction<Integer, IN, OUT> {
 

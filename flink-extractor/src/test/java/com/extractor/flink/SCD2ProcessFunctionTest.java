@@ -186,6 +186,38 @@ public class SCD2ProcessFunctionTest {
     }
 
     @Test
+    public void testOutsideTimer() throws Exception {
+        DebeziumSourceRecord insertRecord = new DebeziumSourceRecord();
+        insertRecord.tsMs = 1000L;
+        insertRecord.op = "c";
+
+        DebeziumSourceRecord updateRecord = new DebeziumSourceRecord();
+        long TIMER_INTERVAL = (10 * 1000L);
+        updateRecord.tsMs = 1000L + (TIMER_INTERVAL * 2);
+        updateRecord.op = "u";
+
+        testHarness.processElement(insertRecord, insertRecord.tsMs);
+        testHarness.processElement(updateRecord, updateRecord.tsMs);
+
+        testHarness.setProcessingTime(30000L);
+
+        ConcurrentLinkedQueue<Object> output = testHarness.getOutput();
+        assertEquals(3, output.size());
+
+        TargetDimensionRecord firstRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals((insertRecord.tsMs), firstRecord.validFrom);
+        assertEquals((END_OF_TIME), firstRecord.validTo);
+
+        TargetDimensionRecord closedRecord = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals((insertRecord.tsMs), closedRecord.validFrom);
+        assertEquals((updateRecord.tsMs - 1), closedRecord.validTo);
+
+        TargetDimensionRecord deleteRecordOutput = (TargetDimensionRecord) ((StreamRecord<?>) output.poll()).getValue();
+        assertEquals((updateRecord.tsMs), deleteRecordOutput.validFrom);
+        assertEquals((END_OF_TIME), deleteRecordOutput.validTo); // END_OF_TIME
+    }
+
+    @Test
     public void testDeleteWithSubsequentRecord() throws Exception {
         DebeziumSourceRecord insertRecord = new DebeziumSourceRecord();
         insertRecord.tsMs = 1000L;
