@@ -11,7 +11,6 @@ import org.apache.flink.util.Collector;
 //    {recordSk: 1, recordNk: 1, validFrom: 10, validTo: Inf}
 //    {recordSk: 1, recordNk: 1, validFrom: 10, validTo: 20}
 // This function is designed ton consolidate both into one like so:
-//    {recordSk: 1, validFrom 10, validTo: 20}
 //    {recordSk: 1, recordNk: 1, validFrom: 10, validTo: 20}
 // Catch - This won't occur if the timer expires before the second record occurs
 public class SCD2MostValidFunction<Event extends TargetDimensionRecord> extends KeyedProcessFunction<String, Event, Event> {
