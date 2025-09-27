@@ -11,6 +11,9 @@ import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import com.extractor.flink.model.dimensions.TargetDimensionRecord;
+import com.extractor.flink.model.source.DebeziumSourceRecord;
+
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 

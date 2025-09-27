@@ -1,4 +1,4 @@
-package com.extractor.flink;
+package com.extractor.flink.functions;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.util.KeyedOneInputStreamOperatorTestHarness;
@@ -13,9 +13,8 @@ import org.apache.flink.streaming.api.operators.KeyedProcessOperator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.extractor.flink.functions.DebeziumSourceRecord;
-import com.extractor.flink.functions.SCD2ProcessFunction;
-import com.extractor.flink.functions.TargetDimensionRecord;
+import com.extractor.flink.model.dimensions.TargetDimensionRecord;
+import com.extractor.flink.model.source.DebeziumSourceRecord;
 
 public class SCD2ProcessFunctionTest {
     private static final long END_OF_TIME = 253402300799000L;

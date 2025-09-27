@@ -1,6 +1,8 @@
-package com.extractor.flink.functions;
+package com.extractor.flink.model.dimensions;
 
 import java.io.Serializable;
+
+import com.extractor.flink.model.source.DebeziumSourceRecord;
 
 import lombok.Data;
 

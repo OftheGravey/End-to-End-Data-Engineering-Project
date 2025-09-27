@@ -1,4 +1,4 @@
-package com.extractor.flink.functions;
+package com.extractor.flink.model.source;
 
 import java.io.Serializable;
 

@@ -6,6 +6,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import com.extractor.flink.model.dimensions.TargetDimensionRecord;
+
 // Function for consolidating SCD2 values when the dimension is later closed
 //  I.e. normally a dimension stream will output:
 //    {recordSk: 1, recordNk: 1, validFrom: 10, validTo: Inf}

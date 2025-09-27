@@ -1,24 +1,18 @@
-package com.extractor.flink;
+package com.extractor.flink.functions;
 
-import org.apache.commons.math3.optim.nonlinear.vector.Target;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.util.KeyedOneInputStreamOperatorTestHarness;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.junit.jupiter.api.AfterEach;
 
-import java.sql.Timestamp;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.flink.streaming.api.operators.KeyedProcessOperator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.extractor.flink.functions.DebeziumSourceRecord;
-import com.extractor.flink.functions.SCD2MostValidFunction;
-import com.extractor.flink.functions.SCD2ProcessFunction;
-import com.extractor.flink.functions.TargetDimensionRecord;
+import com.extractor.flink.model.dimensions.TargetDimensionRecord;
 
 public class SCD2LatestDimensionTest {
     private static final long END_OF_TIME = 253402300799000L;

@@ -2,9 +2,6 @@ package com.extractor.flink;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.lang.reflect.Type;
-import java.sql.Date;
-import java.sql.Timestamp;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -13,11 +10,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.apache.flink.streaming.api.operators.KeyedProcessOperator;
-import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import com.extractor.flink.functions.SCD2ProcessFunction;
 import com.extractor.flink.jobs.dimensions.OrdersDimensionJob;
+import com.extractor.flink.model.dimensions.OrderDimension;
+import com.extractor.flink.model.source.Order;
 
 public class OrdersDimensionJobTest extends OrdersDimensionJob {
     private KeyedOneInputStreamOperatorTestHarness<Integer, Order, OrderDimension> testHarness;
